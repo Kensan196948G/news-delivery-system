@@ -49,19 +49,7 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          python3 -c "
-import json, sys
-with open('safety-report.json', 'r') as f:
-    data = json.load(f)
-    vulns = data.get('vulnerabilities', [])
-    if vulns:
-        print(f'Found {len(vulns)} vulnerabilities')
-        for vuln in vulns[:5]:  # Show first 5
-            print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
-        sys.exit(1)
-    else:
-        print('No vulnerabilities found')
-" || echo "safety_issues=true" >> $GITHUB_OUTPUT
+          python3 -c "import json, sys; data = json.loads(open('safety-report.json').read()); vulns = data.get('vulnerabilities', []); [print(f'- {v.get(\"package_name\", \"unknown\")}: {v.get(\"vulnerability_id\", \"unknown\")}') for v in vulns[:5]]; print(f'Found {len(vulns)} vulnerabilities') if vulns else print('No vulnerabilities found'); sys.exit(1 if vulns else 0)" || echo "safety_issues=true" >> $GITHUB_OUTPUT
         fi
         
     - name: Run Bandit Security Scan
@@ -72,14 +60,7 @@ with open('safety-report.json', 'r') as f:
         
         if [ -f bandit-report.json ]; then
           # Parse bandit report
-          python3 -c "; import json, sys; with open('bandit-report.json', 'r') as f:; data = json.load(f); results = data.get('results', []); high_severity = [r for r in results if r.get('issue_severity') == 'HIGH']; medium_severity = [r for r in results if r.get('issue_severity') == 'MEDIUM']; ; if high_severity:; print(f'Found {len(high_severity)} HIGH severity issues'); for issue in high_severity[:3]:; print(f'- {issue.get(\"test_name\", \"unknown\")}: {issue.get(\"issue_text\", \"\")}')
-        sys.exit(1)
-    elif medium_severity:
-        print(f'Found {len(medium_severity)} MEDIUM severity issues')
-        sys.exit(1)
-    else:
-        print('No high/medium security issues found')
-" || echo "bandit_issues=true" >> $GITHUB_OUTPUT
+          python3 -c "import json, sys; data = json.loads(open('bandit-report.json').read()); results = data.get('results', []); high = [r for r in results if r.get('issue_severity') == 'HIGH']; med = [r for r in results if r.get('issue_severity') == 'MEDIUM']; [print(f'- {i.get(\"test_name\", \"?\")}: {i.get(\"issue_text\", \"\")[:50]}') for i in high[:3]]; print(f'HIGH: {len(high)}, MEDIUM: {len(med)} issues'); sys.exit(1 if high or med else 0)" || echo "bandit_issues=true" >> $GITHUB_OUTPUT
         fi
         
     - name: Run pip-audit
