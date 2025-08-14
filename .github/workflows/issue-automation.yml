@@ -95,7 +95,7 @@ $\{\{assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') + '' :
 - Check if similar issues already exist
 
 💡 **Tips:**
-- Add \`[HIGH PRIORITY]\` to title for urgent issues
+- Add \'[HIGH PRIORITY]\' to title for urgent issues
 - Include steps to reproduce for bugs
 - Provide examples for feature requests`;
 
