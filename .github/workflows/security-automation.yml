@@ -232,20 +232,16 @@ jobs:
             owner: context.repo.owner,
             repo: context.repo.repo,
             title: '🔍 CodeQL Security Analysis - Issues Found',
-            body: `# CodeQL Security Analysis Results
-
-**Analysis Date:** ${new Date().toISOString()}
-
-CodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.
-
-## Next Steps
-1. Go to the **Security** tab in this repository
-2. Review **Code scanning alerts**
-3. Address any identified vulnerabilities
-4. Re-run the analysis to verify fixes
-
----
-🤖 This issue was automatically created by CodeQL analysis.`,
+            body: '# CodeQL Security Analysis Results\n\n' +
+              '**Analysis Date:** ' + new Date().toISOString() + '\n\n' +
+              'CodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.\n\n' +
+              '## Next Steps\n' +
+              '1. Go to the **Security** tab in this repository\n' +
+              '2. Review **Code scanning alerts**\n' +
+              '3. Address any identified vulnerabilities\n' +
+              '4. Re-run the analysis to verify fixes\n\n' +
+              '---\n' +
+              '🤖 This issue was automatically created by CodeQL analysis.',
             labels: ['security', 'codeql', 'automated']
           });
 

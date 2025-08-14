@@ -100,26 +100,21 @@ jobs:
           };
           
           console.log('📤 メール送信情報:');
-          console.log(`- 宛先: ${notificationData.recipient}`);
-          console.log(`- 件名: ${notificationData.subject}`);
-          console.log(`- 送信時刻: ${notificationData.timestamp}`);
+          console.log('- 宛先: ' + notificationData.recipient);
+          console.log('- 件名: ' + notificationData.subject);
+          console.log('- 送信時刻: ' + notificationData.timestamp);
           
           // メール送信ログ記録
-          const logEntry = `
-📧 **メール送信完了**
-
-**送信時刻**: ${notificationData.timestamp}
-**宛先**: ${notificationData.recipient}
-**件名**: ${notificationData.subject}
-**ステータス**: ✅ 送信成功
-
----
-**メール内容**:
-${emailBody}
----
-
-🤖 **自動通知システム**
-          `;
+          const logEntry = '📧 **メール送信完了**\\n\\n' +
+            '**送信時刻**: ' + notificationData.timestamp + '\\n' +
+            '**宛先**: ' + notificationData.recipient + '\\n' +
+            '**件名**: ' + notificationData.subject + '\\n' +
+            '**ステータス**: ✅ 送信成功\\n\\n' +
+            '---\\n' +
+            '**メール内容**:\\n' +
+            emailBody + '\\n' +
+            '---\\n\\n' +
+            '🤖 **自動通知システム**';
           
           console.log('✅ メール送信完了');
           

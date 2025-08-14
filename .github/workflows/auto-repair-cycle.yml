@@ -367,19 +367,14 @@ jobs:
             '- `/repair` - 追加修復実行\\n' +
             '- `/merge` - 自動マージ承認\\n' +
             '- `/close` - Issue解決・クローズ\\n' +
-            '- `/escalate` - 人間レビュー要求'
-
-### 📈 監視メトリクス
-
-- **平均修復時間**: 3-5分
-- **自動解決率**: 85%+
-- **品質スコア**: 向上継続中
-
----
-
-**⚠️ アクション不要**: 自動修復サイクル実行中
-**🤖 完全自動生成**: Continuous Monitoring System
-          `;
+            '- `/escalate` - 人間レビュー要求\\n\\n' +
+            '### 📈 監視メトリクス\\n\\n' +
+            '- **平均修復時間**: 3-5分\\n' +
+            '- **自動解決率**: 85%+\\n' +
+            '- **品質スコア**: 向上継続中\\n\\n' +
+            '---\\n\\n' +
+            '**⚠️ アクション不要**: 自動修復サイクル実行中\\n' +
+            '**🤖 完全自動生成**: Continuous Monitoring System';
           
           const issue = await github.rest.issues.create({
             owner: context.repo.owner,
