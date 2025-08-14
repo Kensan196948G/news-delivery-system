@@ -51,18 +51,16 @@ jobs:
           # テストメール
           SUBJECT="🧪 テスト通知 - ニュース配信システム"
           RECIPIENT="${{ github.event.inputs.test_email }}"
-          BODY="
-🧪 メール通知テスト
+          BODY="🧪 メール通知テスト
 
-送信時刻: $TIMESTAMP
+送信時刻: ${TIMESTAMP}
 システム: ニュース配信システム
 状態: ✅ 正常動作
 
 これはメール通知機能のテストです。
 自動フロー成功時にこのような通知が送信されます。
 
-🤖 自動通知システム
-          "
+🤖 自動通知システム"
         else
           # 実際の通知
           SUBJECT="${{ inputs.subject }}"
@@ -91,9 +89,7 @@ jobs:
         echo "subject=$SUBJECT" >> $GITHUB_OUTPUT
         
         # ボディをファイルに保存（改行対応）
-        cat > email_body.txt << 'EOF'
-$BODY
-EOF
+        echo "$BODY" > email_body.txt
         
     - name: Send Email via GitHub API Notification
       uses: actions/github-script@v7
