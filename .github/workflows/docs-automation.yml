@@ -49,48 +49,45 @@ jobs:
       run: |
         echo "Checking documentation coverage..."
         
-        # Create and run Python script inline
-        python3 -c "
-        import ast
-        import os
-        import sys
-        
-        def check_docstrings(file_path):
-            with open(file_path, 'r') as f:
-                tree = ast.parse(f.read())
-            
-            missing_docs = []
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-                    if not ast.get_docstring(node):
-                        missing_docs.append(f'{file_path}:{node.lineno} - {node.name}')
-            return missing_docs
-        
-        all_missing = []
-        for root, dirs, files in os.walk('src'):
-            dirs[:] = [d for d in dirs if d != '__pycache__']
-            for file in files:
-                if file.endswith('.py') and not file.startswith('__'):
-                    file_path = os.path.join(root, file)
-                    try:
-                        missing = check_docstrings(file_path)
-                        all_missing.extend(missing)
-                    except:
-                        pass
-        
-        if all_missing:
-            print(f'Found {len(all_missing)} missing docstrings:')
-            for item in all_missing[:20]:  # Show first 20
-                print(f'  {item}')
-            
-            with open('missing_docstrings.txt', 'w') as f:
-                f.write('\\n'.join(all_missing))
-            
-            print('missing_docstrings=true')
-        else:
-            print('All functions and classes have docstrings!')
-            print('missing_docstrings=false')
-        " > doc_check.log 2>&1
+        # Check for missing docstrings
+        python -c "
+import ast
+import os
+import sys
+
+def check_docstrings(file_path):
+    with open(file_path, 'r') as f:
+        tree = ast.parse(f.read())
+    
+    missing_docs = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            if not ast.get_docstring(node):
+                missing_docs.append(f'{file_path}:{node.lineno} - {node.name}')
+    return missing_docs
+
+all_missing = []
+for root, dirs, files in os.walk('src'):
+    dirs[:] = [d for d in dirs if d != '__pycache__']
+    for file in files:
+        if file.endswith('.py') and not file.startswith('__'):
+            file_path = os.path.join(root, file)
+            missing = check_docstrings(file_path)
+            all_missing.extend(missing)
+
+if all_missing:
+    print(f'Found {len(all_missing)} missing docstrings:')
+    for item in all_missing[:20]:  # Show first 20
+        print(f'  {item}')
+    
+    with open('missing_docstrings.txt', 'w') as f:
+        f.write('\n'.join(all_missing))
+    
+    print('missing_docstrings=true')
+else:
+    print('All functions and classes have docstrings!')
+    print('missing_docstrings=false')
+" > doc_check.log 2>&1
         
         if grep -q "missing_docstrings=true" doc_check.log; then
           echo "missing_docs=true" >> $GITHUB_OUTPUT
@@ -133,51 +130,51 @@ jobs:
       run: |
         echo "Checking code comment density..."
         
-        # Run Python script inline to check comments
-        python3 -c "
-        import os
-        
-        def count_comments_and_lines(file_path):
-            with open(file_path, 'r') as f:
-                lines = f.readlines()
+        python -c "
+import ast
+import os
+
+def count_comments_and_lines(file_path):
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    
+    total_lines = len([line for line in lines if line.strip()])
+    comment_lines = len([line for line in lines if line.strip().startswith('#')])
+    
+    return total_lines, comment_lines
+
+total_code_lines = 0
+total_comment_lines = 0
+low_comment_files = []
+
+for root, dirs, files in os.walk('src'):
+    dirs[:] = [d for d in dirs if d != '__pycache__']
+    for file in files:
+        if file.endswith('.py') and not file.startswith('__'):
+            file_path = os.path.join(root, file)
+            code_lines, comment_lines = count_comments_and_lines(file_path)
             
-            total_lines = len([line for line in lines if line.strip()])
-            comment_lines = len([line for line in lines if line.strip().startswith('#')])
-            
-            return total_lines, comment_lines
-        
-        total_code_lines = 0
-        total_comment_lines = 0
-        low_comment_files = []
-        
-        for root, dirs, files in os.walk('src'):
-            dirs[:] = [d for d in dirs if d != '__pycache__']
-            for file in files:
-                if file.endswith('.py') and not file.startswith('__'):
-                    file_path = os.path.join(root, file)
-                    code_lines, comment_lines = count_comments_and_lines(file_path)
-                    
-                    if code_lines > 20:  # Only check files with substantial code
-                        comment_ratio = comment_lines / code_lines if code_lines > 0 else 0
-                        
-                        if comment_ratio < 0.1:  # Less than 10% comments
-                            low_comment_files.append(f'{file_path} ({comment_ratio:.1%})')
-                        
-                        total_code_lines += code_lines
-                        total_comment_lines += comment_lines
-        
-        overall_ratio = total_comment_lines / total_code_lines if total_code_lines > 0 else 0
-        
-        print(f'Overall comment ratio: {overall_ratio:.1%}')
-        print(f'Files with low comment density: {len(low_comment_files)}')
-        
-        if overall_ratio < 0.1 or len(low_comment_files) > 5:
-            print('needs_more_comments=true')
-            with open('low_comment_files.txt', 'w') as f:
-                f.write('\\n'.join(low_comment_files))
-        else:
-            print('needs_more_comments=false')
-        " > comment_check.log 2>&1
+            if code_lines > 20:  # Only check files with substantial code
+                comment_ratio = comment_lines / code_lines if code_lines > 0 else 0
+                
+                if comment_ratio < 0.1:  # Less than 10% comments
+                    low_comment_files.append(f'{file_path} ({comment_ratio:.1%})')
+                
+                total_code_lines += code_lines
+                total_comment_lines += comment_lines
+
+overall_ratio = total_comment_lines / total_code_lines if total_code_lines > 0 else 0
+
+print(f'Overall comment ratio: {overall_ratio:.1%}')
+print(f'Files with low comment density: {len(low_comment_files)}')
+
+if overall_ratio < 0.1 or len(low_comment_files) > 5:
+    print('needs_more_comments=true')
+    with open('low_comment_files.txt', 'w') as f:
+        f.write('\n'.join(low_comment_files))
+else:
+    print('needs_more_comments=false')
+" > comment_check.log 2>&1
         
         if grep -q "needs_more_comments=true" comment_check.log; then
           echo "needs_comments=true" >> $GITHUB_OUTPUT
@@ -315,15 +312,150 @@ jobs:
         # Create docs directory if it doesn't exist
         mkdir -p docs/api
         
-        # Skip complex documentation generation due to YAML parsing issues
-        echo "Skipping API documentation generation due to workflow file limitations"
+        # Generate module documentation
+        python -c "
+import os
+import importlib.util
+
+def generate_module_doc(module_path, module_name):
+    doc_content = f'''# {module_name.replace('_', ' ').title()} Module
+
+## Overview
+
+This module contains the implementation for {module_name.replace('_', ' ')}.
+
+## Classes and Functions
+
+'''
+    
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        # Get all classes and functions
+        import inspect
+        
+        members = inspect.getmembers(module)
+        
+        for name, obj in members:
+            if not name.startswith('_'):
+                if inspect.isclass(obj):
+                    doc_content += f'### {name} (Class)\n\n'
+                    if obj.__doc__:
+                        doc_content += f'{obj.__doc__}\n\n'
+                    else:
+                        doc_content += 'No documentation available.\n\n'
+                        
+                elif inspect.isfunction(obj):
+                    doc_content += f'### {name}() (Function)\n\n'
+                    if obj.__doc__:
+                        doc_content += f'{obj.__doc__}\n\n'
+                    else:
+                        doc_content += 'No documentation available.\n\n'
+        
+    except Exception as e:
+        doc_content += f'Error loading module: {e}\n'
+    
+    return doc_content
+
+# Generate docs for main modules
+modules = [
+    ('src/main.py', 'main'),
+    ('src/collectors/base_collector.py', 'base_collector'),
+    ('src/processors/translator.py', 'translator'),
+    ('src/notifiers/gmail_sender.py', 'gmail_sender'),
+]
+
+for module_path, module_name in modules:
+    if os.path.exists(module_path):
+        doc_content = generate_module_doc(module_path, module_name)
+        
+        with open(f'docs/api/{module_name}.md', 'w') as f:
+            f.write(doc_content)
+        
+        print(f'Generated docs/api/{module_name}.md')
+"
         
     - name: Update Architecture Diagram
       run: |
         echo "Updating architecture documentation..."
         
-        # Skip creating architecture doc - it has complex content that breaks YAML parsing
-        echo "Architecture documentation update skipped due to YAML parsing issues"
+        cat > docs/ARCHITECTURE.md << 'EOF'
+# System Architecture
+
+## Overview
+
+The News Delivery System is designed as a modular, event-driven architecture that automatically collects, processes, and delivers news content.
+
+## Component Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    News Delivery System                      │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  Collectors │  │ Processors  │  │ Generators  │         │
+│  │             │  │             │  │             │         │
+│  │ • NewsAPI   │  │ • Translator│  │ • HTML Gen  │         │
+│  │ • GNews     │  │ • Analyzer  │  │ • PDF Gen   │         │
+│  │ • NVD       │  │ • Dedup     │  │             │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│          │                │                │               │
+│          └────────────────┼────────────────┘               │
+│                          │                                 │
+│  ┌─────────────┐        │        ┌─────────────┐         │
+│  │  Database   │◄───────┼───────►│ Notifiers   │         │
+│  │             │        │        │             │         │
+│  │ • SQLite    │        │        │ • Gmail     │         │
+│  │ • Cache     │        │        │ • SMTP      │         │
+│  └─────────────┘        │        └─────────────┘         │
+│                          │                                 │
+│  ┌─────────────┐        │        ┌─────────────┐         │
+│  │ Monitoring  │◄───────┼───────►│ Automation  │         │
+│  │             │        │        │             │         │
+│  │ • Logging   │        │        │ • Cron      │         │
+│  │ • Alerts    │        │        │ • Backup    │         │
+│  └─────────────┘        │        └─────────────┘         │
+│                          │                                 │
+│                    ┌─────▼─────┐                          │
+│                    │   Main    │                          │
+│                    │Controller │                          │
+│                    └───────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Data Flow
+
+1. **Collection Phase**: Multiple collectors gather news from various sources
+2. **Processing Phase**: Articles are translated, analyzed, and deduplicated
+3. **Generation Phase**: Reports are generated in HTML and PDF formats
+4. **Delivery Phase**: Reports are sent via email
+5. **Monitoring Phase**: System logs activities and sends alerts on errors
+
+## Security Considerations
+
+- API keys stored securely in environment variables
+- Email credentials managed through OAuth2
+- All HTTP connections use TLS
+- Input validation on all external data
+- Regular security scans via GitHub Actions
+
+## Scalability
+
+- Modular design allows easy addition of new collectors
+- Asynchronous processing for better performance
+- Database caching reduces API calls
+- Configurable retry mechanisms for reliability
+
+## Deployment
+
+- GitHub Actions for CI/CD
+- Automated testing and quality gates
+- Security scanning and dependency updates
+- Multiple deployment environments supported
+
+EOF
         
     - name: Commit Generated Documentation
       run: |
@@ -332,7 +464,14 @@ jobs:
         
         if [ -n "$(git status --porcelain)" ]; then
           git add docs/
-          git commit -m "docs: Auto-generate API documentation and architecture - Generated API docs for core modules, Updated architecture diagram, Automated documentation maintenance. Generated with Claude Code. Co-Authored-By: Claude <noreply@anthropic.com>"
+          git commit -m "docs: Auto-generate API documentation and architecture
+
+- Generated API docs for core modules
+- Updated architecture diagram
+- Automated documentation maintenance
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>"
           git push
         else
           echo "No documentation changes to commit"

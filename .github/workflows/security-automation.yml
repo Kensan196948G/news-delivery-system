@@ -2,10 +2,8 @@ name: Security Automation
 
 on:
   schedule:
-    # Run security checks daily at 2:00 AM JST (full scan)
+    # Run security checks daily at 2:00 AM JST
     - cron: '0 17 * * *'  # 17:00 UTC = 2:00 JST
-    # Quick security checks every hour during business hours (9-18 JST)
-    - cron: '0 0-9 * * *'  # 00:00-09:00 UTC = 09:00-18:00 JST
   workflow_dispatch: # Allow manual trigger
   push:
     branches: [main]
@@ -51,7 +49,19 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          python3 -c "import json, sys; data = json.load(open('safety-report.json', 'r')) if True else {}; vulns = data.get('vulnerabilities', []); print(f'Found {len(vulns)} vulnerabilities') if vulns else print('No vulnerabilities found'); [print(f\"- {v.get('package_name', 'unknown')}: {v.get('vulnerability_id', 'unknown')}\") for v in vulns[:5]]; sys.exit(1 if vulns else 0)" 2>/dev/null || echo "safety_issues=true" >> $GITHUB_OUTPUT
+          python -c "
+import json, sys
+with open('safety-report.json', 'r') as f:
+    data = json.load(f)
+    vulns = data.get('vulnerabilities', [])
+    if vulns:
+        print(f'Found {len(vulns)} vulnerabilities')
+        for vuln in vulns[:5]:  # Show first 5
+            print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
+        sys.exit(1)
+    else:
+        print('No vulnerabilities found')
+" || echo "safety_issues=true" >> $GITHUB_OUTPUT
         fi
         
     - name: Run Bandit Security Scan
@@ -62,7 +72,25 @@ jobs:
         
         if [ -f bandit-report.json ]; then
           # Parse bandit report
-          python3 -c "import json, sys; data = json.load(open('bandit-report.json', 'r')) if True else {}; results = data.get('results', []); high = [r for r in results if r.get('issue_severity') == 'HIGH']; medium = [r for r in results if r.get('issue_severity') == 'MEDIUM']; print(f'Found {len(high)} HIGH severity issues') if high else (print(f'Found {len(medium)} MEDIUM severity issues') if medium else print('No high/medium security issues found')); [print(f\"- {i.get('test_name', 'unknown')}: {i.get('issue_text', '')[:50]}\") for i in high[:3]]; sys.exit(1 if (high or medium) else 0)" 2>/dev/null || echo "bandit_issues=true" >> $GITHUB_OUTPUT
+          python -c "
+import json, sys
+with open('bandit-report.json', 'r') as f:
+    data = json.load(f)
+    results = data.get('results', [])
+    high_severity = [r for r in results if r.get('issue_severity') == 'HIGH']
+    medium_severity = [r for r in results if r.get('issue_severity') == 'MEDIUM']
+    
+    if high_severity:
+        print(f'Found {len(high_severity)} HIGH severity issues')
+        for issue in high_severity[:3]:
+            print(f'- {issue.get(\"test_name\", \"unknown\")}: {issue.get(\"issue_text\", \"\")}')
+        sys.exit(1)
+    elif medium_severity:
+        print(f'Found {len(medium_severity)} MEDIUM severity issues')
+        sys.exit(1)
+    else:
+        print('No high/medium security issues found')
+" || echo "bandit_issues=true" >> $GITHUB_OUTPUT
         fi
         
     - name: Run pip-audit
@@ -232,16 +260,20 @@ jobs:
             owner: context.repo.owner,
             repo: context.repo.repo,
             title: '🔍 CodeQL Security Analysis - Issues Found',
-            body: '# CodeQL Security Analysis Results\n\n' +
-              '**Analysis Date:** ' + new Date().toISOString() + '\n\n' +
-              'CodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.\n\n' +
-              '## Next Steps\n' +
-              '1. Go to the **Security** tab in this repository\n' +
-              '2. Review **Code scanning alerts**\n' +
-              '3. Address any identified vulnerabilities\n' +
-              '4. Re-run the analysis to verify fixes\n\n' +
-              '---\n' +
-              '🤖 This issue was automatically created by CodeQL analysis.',
+            body: `# CodeQL Security Analysis Results
+
+**Analysis Date:** ${new Date().toISOString()}
+
+CodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.
+
+## Next Steps
+1. Go to the **Security** tab in this repository
+2. Review **Code scanning alerts**
+3. Address any identified vulnerabilities
+4. Re-run the analysis to verify fixes
+
+---
+🤖 This issue was automatically created by CodeQL analysis.`,
             labels: ['security', 'codeql', 'automated']
           });
 

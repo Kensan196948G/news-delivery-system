@@ -11,64 +11,45 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion != 'cancelled'
     
-    permissions:
-      contents: read
-      actions: write
-      pull-requests: write
-      issues: write
-    
     steps:
     - name: Download workflow artifacts
       uses: actions/github-script@v7
-      continue-on-error: true
       with:
         script: |
-          try {
-            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: ${{ github.event.workflow_run.id }}
+          });
+          
+          console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
+          
+          const downloadArtifact = async (artifactName) => {
+            const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == artifactName
+            })[0];
+            
+            if (!matchArtifact) {
+              console.log(`Artifact ${artifactName} not found`);
+              return null;
+            }
+            
+            const download = await github.rest.actions.downloadArtifact({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              run_id: ${{ github.event.workflow_run.id }}
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip',
             });
             
-            console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
-            
-            const downloadArtifact = async (artifactName) => {
-              try {
-                const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
-                  return artifact.name == artifactName
-                })[0];
-                
-                if (!matchArtifact) {
-                  console.log(`Artifact ${artifactName} not found`);
-                  return null;
-                }
-                
-                const download = await github.rest.actions.downloadArtifact({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  artifact_id: matchArtifact.id,
-                  archive_format: 'zip',
-                });
-                
-                const fs = require('fs');
-                fs.writeFileSync(`${artifactName}.zip`, Buffer.from(download.data));
-                console.log(`Successfully downloaded ${artifactName}.zip`);
-                return true;
-              } catch (error) {
-                console.log(`Failed to download ${artifactName}: ${error.message}`);
-                return false;
-              }
-            };
-            
-            // Attempt to download available artifacts
-            await downloadArtifact('security-scan-results');
-            await downloadArtifact('vulnerability-scan-results');
-            await downloadArtifact('coverage-report-3.12');
-            
-          } catch (error) {
-            console.log(`Artifact access failed: ${error.message}`);
-            console.log('Continuing without artifact analysis...');
-          }
+            const fs = require('fs');
+            fs.writeFileSync(`${artifactName}.zip`, Buffer.from(download.data));
+            return true;
+          };
+          
+          // Download available artifacts
+          await downloadArtifact('security-scan-results');
+          await downloadArtifact('vulnerability-scan-results');
+          await downloadArtifact('coverage-report-3.12');
           
     - name: Extract and analyze artifacts
       run: |
@@ -162,64 +143,64 @@ jobs:
         
     - name: Create Quality Gate Report
       run: |
-        {
-          echo "# 🔍 Quality Gate Report"
-          echo ""
-          echo "**Build:** ${{ github.event.workflow_run.html_url }}"
-          echo "**Commit:** ${{ github.event.workflow_run.head_sha }}"
-          echo "**Branch:** ${{ github.event.workflow_run.head_branch }}"
-          echo "**Timestamp:** $(date -u)"
-          echo ""
-          echo "## 📊 Overall Result"
-          echo ""
-          echo "| Metric | Result |"
-          echo "|--------|--------|"
-          echo "| **Quality Gate** | ${{ steps.quality-check.outputs.quality_gate }} |"
-          echo "| **Quality Score** | ${{ steps.quality-check.outputs.quality_score }}/100 |"
-          echo "| **Total Issues** | ${{ steps.quality-check.outputs.total_issues }} |"
-          echo "| **Critical Issues** | ${{ steps.quality-check.outputs.critical_issues }} |"
-          echo ""
-          echo "## 🎯 Quality Standards"
-          echo ""
-          echo "✅ **Passed**: No critical issues, ≤ 5 total issues"
-          echo "⚠️  **Warning**: No critical issues, ≤ 10 total issues"
-          echo "❌ **Failed**: Critical issues present or > 10 total issues"
-          echo ""
-          echo "## 📋 Recommendations"
-          echo ""
-        } > quality-gate-report.md
+        cat > quality-gate-report.md << 'EOF'
+        # 🔍 Quality Gate Report
+        
+        **Build:** ${{ github.event.workflow_run.html_url }}
+        **Commit:** ${{ github.event.workflow_run.head_sha }}
+        **Branch:** ${{ github.event.workflow_run.head_branch }}
+        **Timestamp:** $(date -u)
+        
+        ## 📊 Overall Result
+        
+        | Metric | Result |
+        |--------|--------|
+        | **Quality Gate** | ${{ steps.quality-check.outputs.quality_gate }} |
+        | **Quality Score** | ${{ steps.quality-check.outputs.quality_score }}/100 |
+        | **Total Issues** | ${{ steps.quality-check.outputs.total_issues }} |
+        | **Critical Issues** | ${{ steps.quality-check.outputs.critical_issues }} |
+        
+        ## 🎯 Quality Standards
+        
+        ✅ **Passed**: No critical issues, ≤ 5 total issues
+        ⚠️  **Warning**: No critical issues, ≤ 10 total issues  
+        ❌ **Failed**: Critical issues present or > 10 total issues
+        
+        ## 📋 Recommendations
+        
+        EOF
         
         if [ "${{ steps.quality-check.outputs.quality_gate }}" = "FAILED" ]; then
-          {
-            echo ""
-            echo "### 🚨 Critical Actions Required"
-            echo ""
-            echo "- Address all critical security vulnerabilities"
-            echo "- Fix high-severity security issues"
-            echo "- Review and resolve dependency vulnerabilities"
-            echo "- **Deployment is blocked until issues are resolved**"
-            echo ""
-          } >> quality-gate-report.md
+          cat >> quality-gate-report.md << 'EOF'
+        
+        ### 🚨 Critical Actions Required
+        
+        - Address all critical security vulnerabilities
+        - Fix high-severity security issues
+        - Review and resolve dependency vulnerabilities
+        - **Deployment is blocked until issues are resolved**
+        
+        EOF
         elif [ "${{ steps.quality-check.outputs.quality_gate }}" = "WARNING" ]; then
-          {
-            echo ""
-            echo "### ⚠️ Improvements Recommended"
-            echo ""
-            echo "- Review and address medium-severity issues"
-            echo "- Consider updating dependencies with known vulnerabilities"
-            echo "- Monitor quality trends to prevent degradation"
-            echo ""
-          } >> quality-gate-report.md
+          cat >> quality-gate-report.md << 'EOF'
+        
+        ### ⚠️ Improvements Recommended
+        
+        - Review and address medium-severity issues
+        - Consider updating dependencies with known vulnerabilities
+        - Monitor quality trends to prevent degradation
+        
+        EOF
         else
-          {
-            echo ""
-            echo "### ✅ Quality Standards Met"
-            echo ""
-            echo "- All quality checks passed"
-            echo "- No critical issues detected"
-            echo "- Ready for deployment"
-            echo ""
-          } >> quality-gate-report.md
+          cat >> quality-gate-report.md << 'EOF'
+        
+        ### ✅ Quality Standards Met
+        
+        - All quality checks passed
+        - No critical issues detected
+        - Ready for deployment
+        
+        EOF
         fi
         
         echo "Quality Gate Report:"

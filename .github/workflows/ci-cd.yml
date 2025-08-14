@@ -268,12 +268,12 @@ jobs:
         cp -r scripts/ deploy/ 2>/dev/null || echo "Scripts directory not found"
         
         # Create startup script
-        {
-          echo "#!/bin/bash"
-          echo 'cd "$(dirname "$0")"'
-          echo "python -m pip install -r requirements.txt"
-          echo "python src/main.py"
-        } > deploy/start.sh
+        cat > deploy/start.sh << 'EOF'
+        #!/bin/bash
+        cd "$(dirname "$0")"
+        python -m pip install -r requirements.txt
+        python src/main.py
+        EOF
         chmod +x deploy/start.sh
         
         # Create archive
