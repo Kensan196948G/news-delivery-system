@@ -1,0 +1,265 @@
+name: PR Automation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  pr-validation:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: PR Title and Description Validation
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const pr = context.payload.pull_request;
+          
+          let validationErrors = [];
+          
+          // Title validation
+          const titlePattern = /^(feat|fix|docs|style|refactor|test|chore|ci)(\(.+\))?: .+/;
+          if (!titlePattern.test(pr.title)) {
+            validationErrors.push('❌ PR title must follow conventional commits format: `type(scope): description`');
+          }
+          
+          // Description validation
+          if (!pr.body || pr.body.length < 20) {
+            validationErrors.push('❌ PR description must be at least 20 characters long');
+          }
+          
+          // Check for linked issues
+          const issuePattern = /(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#\d+/i;
+          if (!issuePattern.test(pr.body || '')) {
+            validationErrors.push('⚠️ Consider linking related issues using "Closes #123" in description');
+          }
+          
+          if (validationErrors.length > 0) {
+            const comment = `## 🤖 PR Validation Results\n\n${validationErrors.join('\n')}\n\n### Conventional Commit Types:\n- **feat**: New feature\n- **fix**: Bug fix\n- **docs**: Documentation\n- **style**: Code style changes\n- **refactor**: Code refactoring\n- **test**: Adding tests\n- **chore**: Maintenance tasks\n- **ci**: CI/CD changes`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: comment
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: '✅ PR validation passed! Title and description follow project standards.'
+            });
+          }
+
+  auto-label:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Auto-assign Labels
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const pr = context.payload.pull_request;
+          
+          let labels = [];
+          
+          // Analyze PR title for automatic labeling
+          const title = pr.title.toLowerCase();
+          
+          if (title.includes('feat') || title.includes('feature')) {
+            labels.push('enhancement');
+          }
+          if (title.includes('fix') || title.includes('bug')) {
+            labels.push('bug');
+          }
+          if (title.includes('docs') || title.includes('documentation')) {
+            labels.push('documentation');
+          }
+          if (title.includes('ci') || title.includes('workflow') || title.includes('action')) {
+            labels.push('ci/cd');
+          }
+          if (title.includes('security') || title.includes('vuln')) {
+            labels.push('security');
+          }
+          
+          // Analyze changed files
+          const { data: files } = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: pr.number
+          });
+          
+          const changedFiles = files.map(f => f.filename);
+          
+          if (changedFiles.some(f => f.includes('.github/workflows'))) {
+            labels.push('ci/cd');
+          }
+          if (changedFiles.some(f => f.includes('docs/') || f.endsWith('.md'))) {
+            labels.push('documentation');
+          }
+          if (changedFiles.some(f => f.includes('test'))) {
+            labels.push('test');
+          }
+          if (changedFiles.some(f => f.includes('requirements'))) {
+            labels.push('dependencies');
+          }
+          
+          // Apply labels
+          if (labels.length > 0) {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [...new Set(labels)] // Remove duplicates
+            });
+          }
+
+  auto-assign:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    
+    steps:
+    - name: Auto-assign Reviewers
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const pr = context.payload.pull_request;
+          
+          // Skip if PR is from dependabot
+          if (pr.user.login === 'dependabot[bot]') {
+            return;
+          }
+          
+          // Auto-assign the repository owner as reviewer
+          try {
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              reviewers: [context.repo.owner]
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: '🤖 Auto-assigned reviewer. Thank you for your contribution!'
+            });
+          } catch (error) {
+            console.log('Could not auto-assign reviewer:', error.message);
+          }
+
+  size-labeling:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: PR Size Labeling
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const pr = context.payload.pull_request;
+          
+          const { data: files } = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: pr.number
+          });
+          
+          let totalChanges = 0;
+          files.forEach(file => {
+            totalChanges += file.additions + file.deletions;
+          });
+          
+          let sizeLabel = '';
+          if (totalChanges < 10) {
+            sizeLabel = 'size/XS';
+          } else if (totalChanges < 30) {
+            sizeLabel = 'size/S';
+          } else if (totalChanges < 100) {
+            sizeLabel = 'size/M';
+          } else if (totalChanges < 500) {
+            sizeLabel = 'size/L';
+          } else {
+            sizeLabel = 'size/XL';
+          }
+          
+          // Remove existing size labels first
+          const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr.number
+          });
+          
+          for (const label of existingLabels) {
+            if (label.name.startsWith('size/')) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                name: label.name
+              });
+            }
+          }
+          
+          // Add new size label
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr.number,
+            labels: [sizeLabel]
+          });
+
+  auto-merge-dependabot:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    needs: [pr-validation, auto-label]
+    
+    steps:
+    - name: Enable auto-merge for Dependabot PRs
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const pr = context.payload.pull_request;
+          
+          // Check if PR title indicates a patch or minor update
+          const title = pr.title.toLowerCase();
+          const isPatchUpdate = title.includes('patch') || title.includes('dependencies');
+          
+          if (isPatchUpdate) {
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              commit_title: `Auto-merge: ${pr.title}`,
+              commit_message: 'Automatically merged dependabot PR for patch updates',
+              merge_method: 'squash'
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: '🤖 Auto-merged patch dependency update. All checks passed!'
+            });
+          }

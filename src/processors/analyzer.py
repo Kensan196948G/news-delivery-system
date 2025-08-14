@@ -85,7 +85,7 @@ class ClaudeAnalyzer:
         
         # Claude API設定
         self.api_key = self.config.get_env('ANTHROPIC_API_KEY')
-        self.model_name = self.config.get('ai_analysis.model', default="claude-3-sonnet-20240229")
+        self.model_name = self.config.get('ai_analysis.model', default="claude-3-5-sonnet-20241022")
         self.max_tokens = self.config.get('ai_analysis.max_tokens', default=1000)
         
         # バッチ処理設定
@@ -133,9 +133,11 @@ class ClaudeAnalyzer:
             # 結果を記事に適用
             self._apply_analysis_result(article, analysis_result)
             
-            # 結果をキャッシュ
+            # 結果をキャッシュ（Enumを文字列に変換）
             cache_data = asdict(analysis_result)
-            self.cache_manager.set(cache_key, cache_data, ttl=self.cache_ttl)
+            if 'sentiment' in cache_data and hasattr(cache_data['sentiment'], 'value'):
+                cache_data['sentiment'] = cache_data['sentiment'].value
+            self.cache_manager.set(cache_key, cache_data, expire=self.cache_ttl)
             
             # 統計更新
             processing_time = (datetime.now() - start_time).total_seconds()

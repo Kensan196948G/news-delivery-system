@@ -1,0 +1,29 @@
+# CodeRabbit AI設定ファイル
+# GitHub Actions自動化システム用設定
+
+# レビュー設定
+reviews:
+  # レート制限対策
+  request_changes: auto
+  auto_review:
+    enabled: true
+    drafts: false
+  
+  # 自動化ワークフロー対応
+  path_filters:
+    - "!test-vulnerability.py"  # テスト脆弱性ファイルは除外
+    - ".github/workflows/**"    # ワークフロー重点レビュー
+    - "docs/**"                # ドキュメント軽量レビュー
+  
+  # スキップ条件
+  ignore:
+    - "**/*.md"     # マークダウンファイルは軽量レビュー
+    - "**/CHANGELOG.md"
+    - "**/PR_TEMPLATE.md"
+
+# 言語設定
+language: ja-JP
+
+# コメント設定
+chat:
+  auto_reply: false  # レート制限対策

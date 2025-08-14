@@ -1,0 +1,424 @@
+name: Documentation Automation
+
+on:
+  push:
+    paths:
+      - '**.py'
+      - '**.md'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '**.py'
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      doc_type:
+        description: 'Type of documentation to generate'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api
+          - readme
+          - changelog
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-api-docs:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.doc_type == 'api' || github.event.inputs.doc_type == 'all' || github.event_name != 'workflow_dispatch'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install documentation tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints pydoc-markdown
+      
+      - name: Generate API documentation
+        run: |
+          # Create docs directory if it doesn't exist
+          mkdir -p docs/api
+          
+          # Generate documentation for Python modules
+          python3 << 'EOF'
+import os
+import ast
+import json
+from pathlib import Path
+
+def extract_docstrings(file_path):
+    """Extract docstrings from Python file"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        try:
+            tree = ast.parse(f.read())
+        except:
+            return {}
+    
+    docs = {
+        'module': ast.get_docstring(tree),
+        'classes': {},
+        'functions': {}
+    }
+    
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            docs['classes'][node.name] = {
+                'docstring': ast.get_docstring(node),
+                'methods': {}
+            }
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef):
+                    docs['classes'][node.name]['methods'][item.name] = ast.get_docstring(item)
+        elif isinstance(node, ast.FunctionDef):
+            docs['functions'][node.name] = ast.get_docstring(node)
+    
+    return docs
+
+# Find all Python files
+api_docs = {}
+for py_file in Path('.').glob('**/*.py'):
+    if not any(part.startswith('.') for part in py_file.parts):
+        rel_path = str(py_file)
+        api_docs[rel_path] = extract_docstrings(py_file)
+
+# Generate markdown documentation
+with open('docs/api/API_REFERENCE.md', 'w') as f:
+    f.write('# API Reference\n\n')
+    f.write('Auto-generated API documentation for the News Delivery System.\n\n')
+    
+    for file_path, docs in sorted(api_docs.items()):
+        if docs['module'] or docs['classes'] or docs['functions']:
+            f.write(f'## {file_path}\n\n')
+            
+            if docs['module']:
+                f.write(f'{docs["module"]}\n\n')
+            
+            if docs['classes']:
+                f.write('### Classes\n\n')
+                for class_name, class_info in docs['classes'].items():
+                    f.write(f'#### {class_name}\n\n')
+                    if class_info['docstring']:
+                        f.write(f'{class_info["docstring"]}\n\n')
+                    if class_info['methods']:
+                        f.write('**Methods:**\n\n')
+                        for method_name, method_doc in class_info['methods'].items():
+                            f.write(f'- `{method_name}`: {method_doc or "No documentation"}\n')
+                        f.write('\n')
+            
+            if docs['functions']:
+                f.write('### Functions\n\n')
+                for func_name, func_doc in docs['functions'].items():
+                    f.write(f'#### {func_name}\n\n')
+                    f.write(f'{func_doc or "No documentation"}\n\n')
+
+print('API documentation generated successfully')
+EOF
+      
+      - name: Upload API docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/api/
+          retention-days: 30
+
+  update-readme:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.doc_type == 'readme' || github.event.inputs.doc_type == 'all'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Update README badges
+        run: |
+          python3 << 'EOF'
+import re
+from pathlib import Path
+
+readme_path = Path('README.md')
+if not readme_path.exists():
+    readme_path.write_text('# News Delivery System\n\n')
+
+content = readme_path.read_text()
+
+# Add/update badges section
+badges = """![CI/CD](https://github.com/${{ github.repository }}/workflows/News%20Delivery%20System%20CI%2FCD/badge.svg)
+![Security](https://github.com/${{ github.repository }}/workflows/Security%20Automation/badge.svg)
+![Quality Gate](https://github.com/${{ github.repository }}/workflows/Quality%20Gate/badge.svg)
+![License](https://img.shields.io/github/license/${{ github.repository }})
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+"""
+
+# Check if badges section exists
+if '![CI/CD]' not in content:
+    # Add badges at the top after the title
+    lines = content.split('\n')
+    if lines and lines[0].startswith('#'):
+        lines.insert(1, '\n' + badges + '\n')
+        content = '\n'.join(lines)
+        readme_path.write_text(content)
+        print('Added badges to README')
+else:
+    print('Badges already present in README')
+EOF
+      
+      - name: Generate table of contents
+        run: |
+          python3 << 'EOF'
+import re
+from pathlib import Path
+
+readme_path = Path('README.md')
+if readme_path.exists():
+    content = readme_path.read_text()
+    
+    # Extract headers
+    headers = re.findall(r'^(#{2,6})\s+(.+)$', content, re.MULTILINE)
+    
+    if headers:
+        toc = ['## Table of Contents\n']
+        for level, title in headers:
+            if title != 'Table of Contents':
+                indent = '  ' * (len(level) - 2)
+                anchor = title.lower().replace(' ', '-').replace('.', '').replace(',', '')
+                toc.append(f'{indent}- [{title}](#{anchor})')
+        
+        toc_text = '\n'.join(toc)
+        
+        # Insert or update TOC
+        if '## Table of Contents' not in content:
+            # Find position after badges and description
+            lines = content.split('\n')
+            insert_pos = 2  # Default position
+            for i, line in enumerate(lines):
+                if line.startswith('##') and 'Table of Contents' not in line:
+                    insert_pos = i
+                    break
+            
+            lines.insert(insert_pos, toc_text + '\n')
+            content = '\n'.join(lines)
+            readme_path.write_text(content)
+            print('Added table of contents to README')
+        else:
+            print('Table of contents already present')
+EOF
+
+  generate-changelog:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.doc_type == 'changelog' || github.event.inputs.doc_type == 'all'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate CHANGELOG
+        run: |
+          # Generate changelog from git history
+          python3 << 'EOF'
+import subprocess
+import re
+from datetime import datetime
+from pathlib import Path
+
+def get_git_log():
+    """Get git log with conventional commit format"""
+    cmd = ['git', 'log', '--pretty=format:%H|%ai|%s|%b', '--reverse']
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result.stdout.strip().split('\n')
+
+def parse_commits():
+    """Parse commits into categories"""
+    commits = {
+        'features': [],
+        'fixes': [],
+        'docs': [],
+        'refactor': [],
+        'test': [],
+        'chore': [],
+        'other': []
+    }
+    
+    for line in get_git_log():
+        if not line:
+            continue
+        
+        parts = line.split('|', 3)
+        if len(parts) < 3:
+            continue
+        
+        hash_short = parts[0][:7]
+        date = parts[1].split()[0]
+        message = parts[2]
+        
+        # Parse conventional commit format
+        if message.startswith('feat:') or message.startswith('feature:'):
+            commits['features'].append(f'- {message} ({hash_short})')
+        elif message.startswith('fix:'):
+            commits['fixes'].append(f'- {message} ({hash_short})')
+        elif message.startswith('docs:'):
+            commits['docs'].append(f'- {message} ({hash_short})')
+        elif message.startswith('refactor:'):
+            commits['refactor'].append(f'- {message} ({hash_short})')
+        elif message.startswith('test:'):
+            commits['test'].append(f'- {message} ({hash_short})')
+        elif message.startswith('chore:'):
+            commits['chore'].append(f'- {message} ({hash_short})')
+        else:
+            commits['other'].append(f'- {message} ({hash_short})')
+    
+    return commits
+
+# Generate CHANGELOG
+changelog = Path('CHANGELOG.md')
+commits = parse_commits()
+
+content = f"""# Changelog
+
+All notable changes to the News Delivery System will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased] - {datetime.now().strftime('%Y-%m-%d')}
+
+"""
+
+if commits['features']:
+    content += '### Added\n' + '\n'.join(commits['features'][-10:]) + '\n\n'
+
+if commits['fixes']:
+    content += '### Fixed\n' + '\n'.join(commits['fixes'][-10:]) + '\n\n'
+
+if commits['refactor']:
+    content += '### Changed\n' + '\n'.join(commits['refactor'][-10:]) + '\n\n'
+
+if commits['docs']:
+    content += '### Documentation\n' + '\n'.join(commits['docs'][-10:]) + '\n\n'
+
+changelog.write_text(content)
+print('CHANGELOG.md generated successfully')
+EOF
+
+  validate-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check documentation completeness
+        id: check
+        run: |
+          ISSUES=""
+          
+          # Check for README
+          if [ ! -f README.md ]; then
+            ISSUES="${ISSUES}- Missing README.md\n"
+          fi
+          
+          # Check for LICENSE
+          if [ ! -f LICENSE ] && [ ! -f LICENSE.md ] && [ ! -f LICENSE.txt ]; then
+            ISSUES="${ISSUES}- Missing LICENSE file\n"
+          fi
+          
+          # Check for CONTRIBUTING guidelines
+          if [ ! -f CONTRIBUTING.md ]; then
+            ISSUES="${ISSUES}- Missing CONTRIBUTING.md\n"
+          fi
+          
+          # Check for CODE_OF_CONDUCT
+          if [ ! -f CODE_OF_CONDUCT.md ]; then
+            ISSUES="${ISSUES}- Missing CODE_OF_CONDUCT.md\n"
+          fi
+          
+          if [ -n "$ISSUES" ]; then
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+            echo "issues<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$ISSUES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Comment on PR
+        if: steps.check.outputs.has_issues == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = `${{ steps.check.outputs.issues }}`;
+            
+            const comment = `## 📚 Documentation Review
+            
+            The following documentation items are missing or need attention:
+            
+            ${issues}
+            
+            ### Documentation Checklist
+            - [ ] README.md with project description
+            - [ ] LICENSE file
+            - [ ] CONTRIBUTING.md guidelines
+            - [ ] CODE_OF_CONDUCT.md
+            - [ ] API documentation (if applicable)
+            - [ ] CHANGELOG.md
+            
+            Please ensure all documentation is complete before merging.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: comment
+            });
+
+  commit-docs:
+    runs-on: ubuntu-latest
+    needs: [generate-api-docs, update-readme, generate-changelog]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: api-docs
+          path: docs/api/
+        continue-on-error: true
+      
+      - name: Commit documentation updates
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add -A docs/ README.md CHANGELOG.md
+          
+          if git diff --staged --quiet; then
+            echo "No documentation changes to commit"
+          else
+            git commit -m "📚 Update documentation
+            
+            - Auto-generated API documentation
+            - Updated README badges and TOC
+            - Generated CHANGELOG from commits
+            
+            [skip ci]"
+            
+            git push origin main
+          fi

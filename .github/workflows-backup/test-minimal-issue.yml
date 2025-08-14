@@ -1,0 +1,59 @@
+name: Test Minimal Issue Automation
+
+on:
+  push:
+    branches:
+      - feature/documentation-improvements
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  test-javascript:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Test Issue Detection JavaScript
+      uses: actions/github-script@v7
+      with:
+        script: |
+          console.log('Starting test...');
+          
+          // Create a test issue object
+          const testIssue = {
+            title: 'Test Bug Report',
+            body: 'This is a test issue with bug keyword',
+            number: 999
+          };
+          
+          // Test the problematic line pattern
+          const title = testIssue.title.toLowerCase();
+          const body = (testIssue.body || '').toLowerCase();
+          const content = title + ' ' + body;
+          
+          console.log('Title:', title);
+          console.log('Body:', body);
+          console.log('Content:', content);
+          
+          // Test labeling logic
+          let labels = [];
+          
+          if (content.includes('bug') || content.includes('error')) {
+            labels.push('bug');
+          }
+          
+          console.log('Detected labels:', labels);
+          
+          // Test comment generation
+          const welcomeComment = '👋 Thanks for opening this issue!\n\n' +
+            '🤖 **Auto-triage results:**\n' + 
+            '- Labels added: ' + labels.join(', ') + '\n\n' +
+            '📋 **Next steps:**\n' +
+            '- A maintainer will review this issue shortly';
+          
+          console.log('Welcome comment generated successfully');
+          console.log('Test completed successfully');
+          
+          return { success: true, labels: labels };

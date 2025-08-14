@@ -27,6 +27,9 @@ try:
     GOOGLE_APIS_AVAILABLE = True
 except ImportError:
     GOOGLE_APIS_AVAILABLE = False
+    # Define placeholder classes when Google APIs are not available
+    class Credentials:
+        pass
 
 from models.article import Article
 from utils.config import get_config
@@ -411,7 +414,7 @@ class GmailSender:
             
             # 英語が残っている場合は最初に説明を追加
             if any(char.isalpha() and ord(char) < 128 for char in result):
-                result = "海外ニュース: " + result
+                result = "※未翻訳記事: " + result
             
             return result
             

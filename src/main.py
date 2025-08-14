@@ -32,6 +32,7 @@ from models.database import Database
 from utils.config import ConfigManager
 from utils.logger import setup_logger
 from utils.cache_manager import CacheManager
+from utils.simple_translator import SimpleTranslator
 from utils.monitoring_system import get_monitoring_system
 from services.self_healing_system import get_self_healing_system
 
@@ -353,7 +354,8 @@ class NewsDeliverySystem:
     async def deduplicate(self, articles: List[Article]) -> List[Article]:
         """重複除去"""
         try:
-            return await self.deduplicator.remove_duplicates(articles)
+            result = self.deduplicator.deduplicate(articles)
+            return result.unique_articles
         except Exception as e:
             self.logger.error(f"Deduplication failed: {e}")
             return articles
@@ -387,8 +389,38 @@ class NewsDeliverySystem:
             # 残りは簡易分析
             for article in remaining_articles:
                 article.importance_score = getattr(article, 'importance_score', 5)
-                article.summary = (getattr(article, 'translated_content', '') or 
-                                 getattr(article, 'content', ''))[:200] + '...'
+                
+                # 翻訳されたコンテンツと元のコンテンツの両方をチェック
+                translated_content = getattr(article, 'translated_content', '')
+                original_content = getattr(article, 'content', '')
+                
+                # 日本語の要約を優先
+                if translated_content:
+                    # すでに翻訳されている場合はそのまま使用
+                    article.summary = translated_content[:200] + '...' if len(translated_content) > 200 else translated_content
+                elif original_content:
+                    # 英語コンテンツの場合は翻訳して要約を生成
+                    if any(char.isalpha() and ord(char) < 128 for char in original_content[:50]):
+                        # SimpleTranslatorで翻訳＋要約
+                        translated_summary = SimpleTranslator.create_summary(
+                            article.title or '',
+                            original_content,
+                            max_length=200
+                        )
+                        article.summary = translated_summary
+                        # 翻訳された要約を translated_content にも保存
+                        if not translated_content:
+                            article.translated_content = translated_summary
+                    else:
+                        article.summary = original_content[:200] + '...'
+                else:
+                    # 説明またはタイトルから要約を生成
+                    desc = getattr(article, 'description', '') or getattr(article, 'title', '')
+                    if desc and any(char.isalpha() and ord(char) < 128 for char in desc[:50]):
+                        article.summary = SimpleTranslator.translate_text(desc, max_length=200)
+                    else:
+                        article.summary = desc[:200] if desc else '要約なし'
+                
                 article.keywords = []
                 article.sentiment = 'neutral'
             
@@ -515,11 +547,13 @@ class NewsDeliverySystem:
         """緊急アラートチェック - CLAUDE.md仕様準拠"""
         try:
             # 緊急記事フィルタ（重要度10またはCVSS 9.0以上）
-            emergency_articles = [
-                article for article in articles
-                if (getattr(article, 'importance_score', 0) >= 10 or 
-                    getattr(article, 'cvss_score', 0) >= 9.0)
-            ]
+            emergency_articles = []
+            for article in articles:
+                importance = getattr(article, 'importance_score', 0)
+                cvss = getattr(article, 'cvss_score', 0)
+                if (importance is not None and importance >= 10) or \
+                   (cvss is not None and cvss >= 9.0):
+                    emergency_articles.append(article)
             
             if not emergency_articles:
                 return

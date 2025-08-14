@@ -16,7 +16,9 @@
 
 ### 📰 **高品質ニュース配信**
 - **AI要約**: Claude APIによる200-250文字要約
-- **多言語翻訳**: DeepL APIによる高精度翻訳
+- **多言語翻訳**: DeepL API（有料版対応）による高精度翻訳
+- **英語/日本語分離表示**: 原文と翻訳を見やすく分離
+- **フォールバック翻訳**: DeepL失敗時の簡易翻訳機能
 - **美しいレポート**: HTML/PDF形式で自動生成
 - **分類配信**: 重要度・カテゴリ別整理
 
@@ -38,8 +40,12 @@
 - **ネットワーク**: 安定したインターネット接続
 
 ### 📦 依存関係
-- **Gmail アカウント** (OAuth2設定済み)
-- **API キー** (NewsAPI、DeepL、Claude)
+- **Gmail アカウント** (アプリパスワード設定済み)
+- **API キー**:
+  - NewsAPI: ニュース収集用
+  - DeepL: 翻訳用（無料版・有料版両対応）
+  - Claude (Anthropic): AI分析用
+  - GNews: 補助的ニュース収集用
 - **GitHub アカウント** (Actions有効化)
 
 ### ⚡ 高速セットアップ
@@ -143,8 +149,9 @@ graph TD
     C --> C3[NVD API]
     
     D --> D1[DeepL Translator]
-    D --> D2[Claude Analyzer]
-    D --> D3[Deduplicator]
+    D --> D2[SimpleTranslator Fallback]
+    D --> D3[Claude Analyzer]
+    D --> D4[Deduplicator]
     
     E --> E1[HTML Generator]
     E --> E2[PDF Generator]
@@ -179,6 +186,8 @@ news-delivery-system/
 │   ├── notifiers/              # 通知・配信モジュール
 │   ├── services/               # ビジネスロジック
 │   └── utils/                  # ユーティリティ
+│       ├── simple_translator.py # フォールバック翻訳
+│       └── source_translator.py # ソース名翻訳
 ├── 📁 docs/                    # ドキュメント
 │   ├── システム概要.md         # システム全体概要
 │   ├── セットアップガイド.md   # 導入手順

@@ -14,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader, Template
 
 from models.article import Article, ArticleCategory
 from utils.config import get_config
+from utils.source_translator import SourceTranslator
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +33,37 @@ class HTMLReportGenerator:
         
         if os.path.exists(template_dir):
             self.env = Environment(loader=FileSystemLoader(template_dir))
+            # カスタムフィルターを追加
+            self.env.filters['strftime'] = self._strftime_filter
         else:
             # フォールバック: インラインテンプレート使用
             self.env = Environment()
+            self.env.filters['strftime'] = self._strftime_filter
             logger.warning(f"Template directory not found: {template_dir}. Using inline templates.")
         
         logger.info("HTML Report Generator initialized")
+    
+    def _strftime_filter(self, date, format='%Y-%m-%d %H:%M'):
+        """Jinja2用のstrftimeフィルター"""
+        if date is None:
+            return ''
+        
+        # 文字列の場合、datetimeオブジェクトに変換
+        if isinstance(date, str):
+            try:
+                # ISO形式の日付文字列をパース
+                if 'T' in date:
+                    date = datetime.fromisoformat(date.replace('Z', '+00:00'))
+                else:
+                    date = datetime.strptime(date, '%Y-%m-%d')
+            except ValueError:
+                return date  # 変換できない場合はそのまま返す
+        
+        # datetimeオブジェクトの場合、フォーマット
+        if hasattr(date, 'strftime'):
+            return date.strftime(format)
+        
+        return str(date)
     
     def generate_daily_report(self, articles: List[Article], 
                             report_date: datetime = None) -> str:
@@ -91,9 +117,14 @@ class HTMLReportGenerator:
         """緊急レポート生成"""
         try:
             # 緊急記事のみフィルタ
-            urgent_articles = [a for a in articles 
-                             if getattr(a, 'importance_score', 0) >= 9 
-                             or getattr(a, 'cvss_score', 0) >= 9.0]
+            urgent_articles = []
+            for a in articles:
+                importance = getattr(a, 'importance_score', 0)
+                cvss = getattr(a, 'cvss_score', 0)
+                if importance is not None and importance >= 9:
+                    urgent_articles.append(a)
+                elif cvss is not None and cvss >= 9.0:
+                    urgent_articles.append(a)
             
             # テンプレートデータ準備
             template_data = {
@@ -260,7 +291,10 @@ class HTMLReportGenerator:
             importance = getattr(article, 'importance_score', 0)
             cvss_score = getattr(article, 'cvss_score', 0)
             
-            if importance >= 9 or cvss_score >= 9.0:
+            # Noneチェック
+            if importance is not None and importance >= 9:
+                urgent_articles.append(article)
+            elif cvss_score is not None and cvss_score >= 9.0:
                 urgent_articles.append(article)
         
         # 重要度順にソート
@@ -335,15 +369,45 @@ class HTMLReportGenerator:
             <h2>🚨 緊急アラート</h2>
             {% for article in urgent_alerts %}
             <div class="article">
-                <h3>{{ article.translated_title or article.title }}</h3>
+                {% if article.translated_title and article.title and article.translated_title != article.title %}
+                <h3 style="color: #dc3545;">{{ article.translated_title }}</h3>
+                <p style="font-size: 0.85em; color: #856404; margin: 5px 0;">【原題】{{ article.title }}</p>
+                {% else %}
+                <h3 style="color: #dc3545;">{{ article.translated_title or article.title }}</h3>
+                {% endif %}
                 <div class="article-meta">
                     <span class="importance-badge importance-high">重要度: {{ article.importance_score or 'N/A' }}</span>
                     {% if article.cvss_score %}
                     <span class="importance-badge importance-high">CVSS: {{ article.cvss_score }}</span>
                     {% endif %}
-                    <span>{{ article.source }}</span>
+                    <span>{{ SourceTranslator.translate(article.source) if article.source else '不明なソース' }}</span>
                 </div>
-                <p>{{ article.summary or (article.translated_content or article.content)[:200] + '...' if (article.translated_content or article.content) }}</p>
+                {% if article.translated_content and article.content and article.translated_content != article.content %}
+                <div style="background: #fff3cd; padding: 10px; border-left: 3px solid #ffc107; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 0;"><strong>【日本語訳】</strong></p>
+                    <p style="margin: 5px 0;">{{ article.translated_content[:250] + '...' if article.translated_content|length > 250 else article.translated_content }}</p>
+                </div>
+                <details style="margin: 10px 0;">
+                    <summary style="cursor: pointer; color: #856404; font-size: 0.9em;">【英語原文を表示】</summary>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 5px;">
+                        <p style="margin: 0; font-size: 0.9em; color: #495057;">{{ article.content[:200] + '...' if article.content|length > 200 else article.content }}</p>
+                    </div>
+                </details>
+                {% else %}
+                {% if article.summary %}
+                    {% if article.summary.startswith('【英文記事】') %}
+                    <div style="background: #f0f8ff; padding: 10px; border-left: 3px solid #007bff; border-radius: 5px; margin: 10px 0;">
+                        <p style="margin: 0;">{{ article.summary }}</p>
+                    </div>
+                    {% else %}
+                    <p>{{ article.summary }}</p>
+                    {% endif %}
+                {% elif article.translated_content %}
+                <p>{{ article.translated_content[:200] + '...' if article.translated_content|length > 200 else article.translated_content }}</p>
+                {% elif article.content %}
+                <p style="color: #6c757d; font-size: 0.9em;">【未翻訳】{{ article.content[:200] + '...' if article.content|length > 200 else article.content }}</p>
+                {% endif %}
+                {% endif %}
                 {% if article.keywords %}
                 <div class="keywords">
                     {% for keyword in article.keywords %}
@@ -361,7 +425,12 @@ class HTMLReportGenerator:
             <h2>{{ category }} ({{ category_articles|length }}件)</h2>
             {% for article in category_articles[:10] %}
             <div class="article">
+                {% if article.translated_title and article.title and article.translated_title != article.title %}
+                <h3>{{ article.translated_title }}</h3>
+                <p style="font-size: 0.85em; color: #6c757d; margin: 5px 0;">【原題】{{ article.title }}</p>
+                {% else %}
                 <h3>{{ article.translated_title or article.title }}</h3>
+                {% endif %}
                 <div class="article-meta">
                     {% set importance = article.importance_score or 5 %}
                     <span class="importance-badge {% if importance >= 8 %}importance-high{% elif importance >= 5 %}importance-medium{% else %}importance-low{% endif %}">
@@ -372,7 +441,32 @@ class HTMLReportGenerator:
                     <span>{{ article.published_at[:10] if article.published_at is string else article.published_at.strftime('%Y-%m-%d') }}</span>
                     {% endif %}
                 </div>
-                <p>{{ article.summary or (article.translated_content or article.content)[:200] + '...' if (article.translated_content or article.content) }}</p>
+                {% if article.translated_content and article.content and article.translated_content != article.content %}
+                <div style="background: #f0f8ff; padding: 10px; border-left: 3px solid #007bff; border-radius: 5px; margin: 10px 0;">
+                    <p style="margin: 0;"><strong>【日本語訳】</strong></p>
+                    <p style="margin: 5px 0;">{{ article.translated_content[:200] + '...' if article.translated_content|length > 200 else article.translated_content }}</p>
+                </div>
+                <details style="margin: 10px 0;">
+                    <summary style="cursor: pointer; color: #6c757d; font-size: 0.9em;">【英語原文を表示】</summary>
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 5px;">
+                        <p style="margin: 0; font-size: 0.9em; color: #495057;">{{ article.content[:200] + '...' if article.content|length > 200 else article.content }}</p>
+                    </div>
+                </details>
+                {% else %}
+                {% if article.summary %}
+                    {% if article.summary.startswith('【英文記事】') %}
+                    <div style="background: #f0f8ff; padding: 10px; border-left: 3px solid #007bff; border-radius: 5px; margin: 10px 0;">
+                        <p style="margin: 0;">{{ article.summary }}</p>
+                    </div>
+                    {% else %}
+                    <p>{{ article.summary }}</p>
+                    {% endif %}
+                {% elif article.translated_content %}
+                <p>{{ article.translated_content[:200] + '...' if article.translated_content|length > 200 else article.translated_content }}</p>
+                {% elif article.content %}
+                <p style="color: #6c757d; font-size: 0.9em;">【未翻訳】{{ article.content[:200] + '...' if article.content|length > 200 else article.content }}</p>
+                {% endif %}
+                {% endif %}
                 {% if article.keywords %}
                 <div class="keywords">
                     {% for keyword in article.keywords %}
@@ -394,6 +488,8 @@ class HTMLReportGenerator:
         '''
         
         template = Template(template_str)
+        # SourceTranslatorをテンプレートに渡す
+        data['SourceTranslator'] = SourceTranslator
         return template.render(**data)
     
     def _generate_emergency_inline_template(self, **data) -> str:
@@ -454,6 +550,8 @@ class HTMLReportGenerator:
         '''
         
         template = Template(template_str)
+        # SourceTranslatorをテンプレートに渡す
+        data['SourceTranslator'] = SourceTranslator
         return template.render(**data)
     
     def _generate_weekly_inline_template(self, **data) -> str:
@@ -513,6 +611,8 @@ class HTMLReportGenerator:
         '''
         
         template = Template(template_str)
+        # SourceTranslatorをテンプレートに渡す
+        data['SourceTranslator'] = SourceTranslator
         return template.render(**data)
     
     def _generate_error_report(self, error_message: str) -> str:

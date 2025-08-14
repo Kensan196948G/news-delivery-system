@@ -233,7 +233,8 @@ class Database:
                         url = getattr(article, 'url', '')
                         source_name = getattr(article, 'source_name', '')
                         author = getattr(article, 'author', '')
-                        category = getattr(article, 'category', '')
+                        category_raw = getattr(article, 'category', '')
+                        category = str(category_raw.value) if hasattr(category_raw, 'value') else str(category_raw) if category_raw else ''
                         published_at = article.published_at.isoformat() if isinstance(article.published_at, datetime) else str(article.published_at)
                         collected_at = article.collected_at.isoformat() if hasattr(article, 'collected_at') and isinstance(article.collected_at, datetime) else datetime.now().isoformat()
                         importance_score = getattr(article, 'importance_score', 5)

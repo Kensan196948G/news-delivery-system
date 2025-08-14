@@ -1,0 +1,295 @@
+name: Workflow Improvements Reference
+
+# このファイルは実行時エラー防止のための改善例を示すリファレンスです
+# 各ワークフローに適用すべきベストプラクティスを含みます
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'テストモード'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
+
+env:
+  # グローバル環境変数（すべてのジョブで利用可能）
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '20'
+  
+  # タイムアウト設定
+  DEFAULT_TIMEOUT: '30'
+  
+  # エラーハンドリング
+  CONTINUE_ON_ERROR: 'true'
+
+jobs:
+  setup-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    outputs:
+      python_version: ${{ steps.versions.outputs.python_version }}
+      has_requirements: ${{ steps.check.outputs.has_requirements }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        persist-credentials: false  # セキュリティ向上
+    
+    - name: Validate workflow syntax
+      run: |
+        # YAMLファイルの構文チェック
+        for file in .github/workflows/*.yml; do
+          echo "Checking $file..."
+          python3 -c "import yaml; yaml.safe_load(open('$file'))" || { echo "❌ YAML syntax error in $file"
+
+            exit 1
+          }
+        done
+    
+    - name: Check versions and files
+      id: check
+      run: |
+        # Pythonバージョン確認
+        PYTHON_VERSION="${{ env.PYTHON_VERSION }}"
+        echo "python_version=$PYTHON_VERSION" >> $GITHUB_OUTPUT
+        
+        # requirements.txtの存在確認
+        if [ -f "requirements.txt" ]; then
+          echo "has_requirements=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_requirements=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Version outputs
+      id: versions
+      run: |
+        echo "python_version=${{ env.PYTHON_VERSION }}" >> $GITHUB_OUTPUT
+
+  improved-python-setup:
+    needs: setup-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python with cache
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.setup-validation.outputs.python_version }}
+        cache: 'pip'
+        cache-dependency-path: |
+          requirements*.txt
+          pyproject.toml
+          setup.py
+    
+    - name: Install dependencies with error handling
+      run: |
+        set -euo pipefail
+        
+        # pipのアップグレード（エラーを無視）
+        python -m pip install --upgrade pip || {
+          echo "⚠️ pip upgrade failed, continuing with current version"
+        }
+        
+        # 基本的な依存関係のインストール
+        if [ -f requirements-minimal.txt ]; then
+          echo "Installing minimal requirements..."
+          python -m pip install -r requirements-minimal.txt || {
+            echo "⚠️ Some minimal packages failed to install"
+            echo "Attempting individual package installation..."
+            while IFS= read -r package; do
+              [ -z "$package" ] || [[ "$package" == \#* ]] && continue
+              python -m pip install "$package" || echo "Failed: $package"
+            done < requirements-minimal.txt
+          }
+        fi
+        
+        # メインの依存関係
+        if [ -f requirements.txt ]; then
+          echo "Installing main requirements..."
+          python -m pip install -r requirements.txt || {
+            echo "⚠️ Some packages failed to install"
+            # 必須パッケージのみ個別インストール
+            for pkg in safety bandit flake8 black; do
+              python -m pip install $pkg || echo "Failed to install $pkg"
+            done
+          }
+        fi
+        
+        # 開発用依存関係（オプション）
+        if [ -f requirements-dev.txt ] && [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+          echo "Installing dev requirements..."
+          python -m pip install -r requirements-dev.txt || echo "Dev packages may have failed"
+        fi
+
+  security-checks:
+    needs: improved-python-setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true  # セキュリティチェックの失敗でもワークフローを続行
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run security checks with proper error handling
+      id: security
+      run: |
+        # 変数の初期化
+        SECURITY_ISSUES=0
+        
+        # Safety check
+        if command -v safety &> /dev/null; then
+          echo "Running safety check..."
+          safety check --json > safety-report.json 2>&1 || {
+            echo "⚠️ Security vulnerabilities detected"
+            SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+          }
+        else
+          echo "⚠️ Safety not installed, skipping..."
+        fi
+        
+        # Bandit check
+        if command -v bandit &> /dev/null && [ -d "src/" ]; then
+          echo "Running bandit scan..."
+          bandit -r src/ -f json -o bandit-report.json 2>&1 || {
+            echo "⚠️ Code security issues detected"
+            SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+          }
+        else
+          echo "⚠️ Bandit not available or src/ not found"
+        fi
+        
+        echo "security_issues=$SECURITY_ISSUES" >> $GITHUB_OUTPUT
+        
+        # 重大な問題がある場合のみ失敗
+        if [ $SECURITY_ISSUES -gt 5 ]; then
+          echo "❌ Too many security issues found"
+          exit 1
+        fi
+
+  command-escaping-example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Proper escaping for special characters
+      run: |
+        # 日本語を含む変数の適切な処理
+        MESSAGE="テストメッセージ: 特殊文字 % $ & を含む"
+        
+        # 変数展開時のクォート
+        echo "$MESSAGE"
+        
+        # JSONでの使用時
+        JSON_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
+        echo "{\"message\": \"$JSON_MESSAGE\"}"
+        
+        # URLエンコード
+        URL_ENCODED=$(echo "$MESSAGE" | sed 's/ /%20/g')
+        echo "Encoded: $URL_ENCODED"
+    
+    - name: GitHub Script with proper escaping
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // 日本語と特殊文字を含むメッセージ
+          const message = '自動修復: 100% 完了 & テスト成功';
+          
+          // バッククォートの代わりに文字列連結を使用
+          const body = '## レポート\\n\\n' +
+            '進捗: ' + message + '\\n' +
+            '時刻: ' + new Date().toISOString();
+          
+          console.log(body);
+
+  error-recovery-pattern:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Error recovery with retry
+      id: retry_step
+      run: |
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
+          
+          # 実行したいコマンド
+          if python -c "import random; exit(0 if random.random() > 0.5 else 1)"; then echo "✅ Success!"
+
+            break
+          else
+            echo "⚠️ Failed, retrying..."
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            [ $RETRY_COUNT -lt $MAX_RETRIES ] && sleep 5
+          fi
+        done
+        
+        if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+          echo "❌ All retries failed"
+          exit 1
+        fi
+    
+    - name: Conditional execution based on file existence
+      run: |
+        # ファイルの存在確認による条件分岐
+        if [ -f "config.json" ]; then
+          echo "Config file found"
+          cat config.json
+        else
+          echo "Config file not found, using defaults"
+          echo '{"default": true}' > config.json
+        fi
+    
+    - name: Safe directory operations
+      run: |
+        # ディレクトリの安全な作成
+        mkdir -p logs reports temp
+        
+        # ファイルの安全な削除
+        rm -f temp/*.tmp 2>/dev/null || true
+        
+        # 古いファイルのクリーンアップ
+        find logs -type f -mtime +7 -delete 2>/dev/null || echo "No old logs to clean"
+
+  best-practices-summary:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [setup-validation, improved-python-setup, security-checks]
+    
+    steps:
+    - name: Summary of improvements
+      run: |
+        echo "========================================\n        ワークフロー改善のベストプラクティス\n        ========================================\n        \n        1. エラーハンドリング\n           - || true または || echo \"message\" を使用\n           - set -euo pipefail でエラー時の即座の終了\n           - continue-on-error: true で重要でないステップの失敗を許容\n        \n        2. タイムアウト設定\n           - ジョブレベル: timeout-minutes: 30\n           - ステップレベル: timeout-minutes: 5\n        \n        3. キャッシュの活用\n           - actions/setup-python@v5 with cache: 'pip'\n           - actions/cache@v4 for custom caching\n        \n        4. セキュリティ\n           - persist-credentials: false\n           - 最小限の権限設定\n           - シークレットの適切な使用\n        \n        5. 変数とシークレット\n           - ${{ secrets.GITHUB_TOKEN }} は自動提供\n           - カスタムシークレットは Settings > Secrets で設定\n           - 環境変数は env: セクションで定義\n        \n        6. 条件実行\n           - if: always() - 常に実行\n           - if: failure() - 失敗時のみ\n           - if: success() - 成功時のみ\n           - if: cancelled() - キャンセル時のみ\n        \n        7. 出力の管理\n           - echo \"key=value\" >> $GITHUB_OUTPUT\n           - steps.<step_id>.outputs.<output_name>\n        \n        8. デバッグ\n           - ACTIONS_RUNNER_DEBUG: true\n           - ACTIONS_STEP_DEBUG: true"
+
+  notification:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [setup-validation, improved-python-setup, security-checks, command-escaping-example, error-recovery-pattern]
+    
+    steps:
+    - name: Send notification
+      run: |
+        # ジョブの結果を集計
+        echo "Setup Validation: ${{ needs.setup-validation.result }}"
+        echo "Python Setup: ${{ needs.improved-python-setup.result }}"
+        echo "Security Checks: ${{ needs.security-checks.result }}"
+        echo "Command Escaping: ${{ needs.command-escaping-example.result }}"
+        echo "Error Recovery: ${{ needs.error-recovery-pattern.result }}"
+        
+        # 全体の結果判定
+        if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+          echo "⚠️ Some jobs failed"
+        else
+          echo "✅ All jobs completed successfully"
+        fi

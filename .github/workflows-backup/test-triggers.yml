@@ -1,0 +1,139 @@
+name: Test Trigger Workflows
+
+on:
+  push:
+    branches:
+      - feature/documentation-improvements
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  test-issue-automation-logic:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Test Issue Automation JavaScript
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Simulate issue object
+          const issue = {
+            title: 'Test Bug Report',
+            body: 'This is a bug in the system',
+            number: 999,
+            user: { login: 'testuser' }
+          };
+          
+          let labels = [];
+          let assignees = [];
+          
+          // Test the exact logic from issue-automation.yml
+          const title = issue.title.toLowerCase();
+          const body = (issue.body || '').toLowerCase();
+          const content = title + ' ' + body;
+          
+          // Auto-labeling based on keywords
+          if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
+            labels.push('bug');
+          }
+          if (content.includes('feature') || content.includes('enhancement') || content.includes('improve')) {
+            labels.push('enhancement');
+          }
+          
+          console.log('Issue:', issue);
+          console.log('Content:', content);
+          console.log('Labels:', labels);
+          
+          // Test welcome comment generation
+          const welcomeComment = '👋 Thanks for opening this issue!\\n\\n🤖 **Auto-triage results:**\\n' + 
+            (labels.length > 0 ? '- Labels added: ' + labels.join(', ') : '- No automatic labels applied') + '\\n' +
+            (assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') : '') + '\\n\\n' +
+            '📋 **Next steps:**\\n' +
+            '- A maintainer will review this issue shortly\\n' +
+            '- Please ensure all required information is provided\\n' +
+            '- Check if similar issues already exist\\n\\n' +
+            '💡 **Tips:**\\n' +
+            '- Add \\'[HIGH PRIORITY]\\' to title for urgent issues\\n' +
+            '- Include steps to reproduce for bugs\\n' +
+            '- Provide examples for feature requests';
+          
+          console.log('Welcome comment generated successfully');
+          return { success: true, labels: labels };
+
+  test-self-heal-logic:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Test Self-Heal Detection
+      uses: actions/github-script@v7
+      with:
+        script: |
+          console.log('Testing self-heal detection logic');
+          
+          // Simulate getting issues
+          const mockIssues = [
+            {
+              number: 1,
+              title: 'CI/CD Pipeline Failed',
+              labels: [{ name: 'ci/cd' }, { name: 'bug' }],
+              created_at: new Date().toISOString()
+            }
+          ];
+          
+          console.log('Mock issues:', mockIssues);
+          
+          const healableIssues = mockIssues.filter(issue => 
+            issue.labels.some(label => 
+              ['ci/cd', 'workflow', 'automation', 'test-failure'].includes(label.name)
+            )
+          );
+          
+          console.log('Healable issues found:', healableIssues.length);
+          
+          if (healableIssues.length > 0) {
+            console.log('Would attempt to heal issue #' + healableIssues[0].number);
+          }
+          
+          return { success: true, healableCount: healableIssues.length };
+
+  test-auto-flow-detection:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Test Auto-Flow Detection Logic
+      run: |
+        echo "Testing auto-flow detection logic"
+        
+        PROBLEMS_DETECTED=false
+        DETECTION_RESULTS=()
+        SEVERITY_LEVEL="LOW"
+        
+        # Test file existence checks
+        echo "Checking critical files..."
+        critical_files=("README.md" ".github/workflows/ci-cd.yml")
+        
+        for file in "${critical_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "Missing: $file"
+            PROBLEMS_DETECTED=true
+            DETECTION_RESULTS+=("Missing: $file")
+          else
+            echo "Found: $file"
+          fi
+        done
+        
+        echo "Problems detected: $PROBLEMS_DETECTED"
+        echo "Detection results: ${DETECTION_RESULTS[*]}"
+        echo "Severity: $SEVERITY_LEVEL"
+        
+        # Test output generation
+        echo "problems_detected=$PROBLEMS_DETECTED" >> $GITHUB_OUTPUT
+        echo "Test completed successfully"
