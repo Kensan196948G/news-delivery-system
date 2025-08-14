@@ -173,17 +173,29 @@ jobs:
           echo "Building News Delivery System..."
           python -m compileall .
       
+      - name: Prepare deployment directory
+        run: |
+          # Create a clean directory for deployment files
+          mkdir -p deployment_files
+          
+          # Copy necessary files to deployment directory
+          cp -r src deployment_files/
+          cp -r config deployment_files/
+          cp -r templates deployment_files/
+          cp -r scripts deployment_files/
+          cp requirements.txt deployment_files/ || true
+          cp requirements-minimal.txt deployment_files/ || true
+          cp README.md deployment_files/ || true
+          cp CLAUDE.md deployment_files/ || true
+          
+          # Remove any __pycache__ directories that might have been copied
+          find deployment_files -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find deployment_files -type f -name "*.pyc" -delete 2>/dev/null || true
+      
       - name: Create deployment artifact
         run: |
-          # Create the archive, excluding the archive file itself to prevent recursion
-          tar -czf deployment.tar.gz \
-            --exclude='.git' \
-            --exclude='*.pyc' \
-            --exclude='__pycache__' \
-            --exclude='deployment.tar.gz' \
-            --exclude='.github/workflows-disabled' \
-            --exclude='.github/workflows-backup' \
-            .
+          # Create archive from the prepared directory (outside of it to avoid recursion)
+          tar -czf deployment.tar.gz -C deployment_files .
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
