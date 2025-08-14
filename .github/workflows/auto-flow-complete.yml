@@ -188,7 +188,7 @@ jobs:
             labels: ['auto-detection', 'in-progress', 'automated-flow']
           });
           
-          console.log(`✅ Issue自動作成完了: #${issue.data.number}`);
+          console.log('✅ Issue自動作成完了: #' + issue.data.number);
           return issue.data.number;
 
   # 🔧 Phase 3: 自動修復実行
@@ -338,7 +338,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const branchName = `auto-repair-flow/${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}`;
+          const branchName = 'auto-repair-flow/' + new Date().toISOString().slice(0,19).replace(/[:-]/g, '');
           
           const pr = await github.rest.pulls.create({
             owner: context.repo.owner,
@@ -387,8 +387,8 @@ jobs:
             labels: ['auto-repair', 'automated-flow', 'ready-for-merge']
           });
           
-          console.log(`✅ PR自動作成完了: #${pr.data.number}`);
-          console.log(`🔗 PR URL: ${pr.data.html_url}`);
+          console.log('✅ PR自動作成完了: #' + pr.data.number);
+          console.log('🔗 PR URL: ' + pr.data.html_url);
           
           core.setOutput('pr_number', pr.data.number);
           core.setOutput('pr_url', pr.data.html_url);

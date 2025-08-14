@@ -287,7 +287,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const branchName = context.payload.ref || `auto-repair/${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}`;
+          const branchName = context.payload.ref || 'auto-repair/' + new Date().toISOString().slice(0,19).replace(/[:-]/g, '');
           
           const pr = await github.rest.pulls.create({
             owner: context.repo.owner,
@@ -331,7 +331,7 @@ jobs:
             labels: ['auto-repair', 'enhancement', 'auto-generated', 'ready-for-review']
           });
           
-          console.log(`✅ 自動修復PR作成完了: #${pr.data.number}`);
+          console.log('✅ 自動修復PR作成完了: #' + pr.data.number);
           return pr.data.number;
 
   # 📋 Phase 4: Issue自動作成 → 分析・応答
@@ -384,7 +384,7 @@ jobs:
             labels: ['monitoring', 'auto-tracking', 'auto-generated']
           });
           
-          console.log(`✅ 追跡Issue作成完了: #${issue.data.number}`);
+          console.log('✅ 追跡Issue作成完了: #' + issue.data.number);
 
   # 📈 Phase 5: サイクル完了レポート
   cycle-completion:

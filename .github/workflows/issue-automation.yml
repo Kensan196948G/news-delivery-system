@@ -43,7 +43,7 @@ jobs:
           // Analyze issue title and body for automatic labeling
           const title = issue.title.toLowerCase();
           const body = (issue.body || '').toLowerCase();
-          const content = `${title} ${body}`;
+          const content = title + ' ' + body;
           
           // Auto-labeling based on keywords
           if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
@@ -103,8 +103,8 @@ jobs:
             '👋 Thanks for opening this issue!',
             '',
             '🤖 **Auto-triage results:**',
-            labels.length > 0 ? `- Labels added: ${labels.join(', ')}` : '- No automatic labels applied',
-            assignees.length > 0 ? `- Auto-assigned to: ${assignees.join(', ')}` : '',
+            labels.length > 0 ? '- Labels added: ' + labels.join(', ') : '- No automatic labels applied',
+            assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') : '',',
             '',
             '📋 **Next steps:**',
             '- A maintainer will review this issue shortly',
@@ -185,7 +185,7 @@ jobs:
           
           if (potentialDuplicates.length > 0) {
             const duplicateList = potentialDuplicates
-              .map(item => `- #${item.number}: ${item.title}`)
+              .map(item => '- #' + item.number + ': ' + item.title)
               .join('\n');
             
             const comment = '🔍 **Potential duplicate issues detected:**\n\n' +
@@ -228,7 +228,7 @@ jobs:
             .map(match => parseInt(match[1]));
           
           if (issueNumbers.length > 0) {
-            const linkedIssues = issueNumbers.map(num => `#${num}`).join(', ');
+            const linkedIssues = issueNumbers.map(num => '#' + num).join(', ');
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -278,7 +278,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: `🤖 Added labels: ${labels.join(', ')}`
+              body: '🤖 Added labels: ' + labels.join(', ')
             });
           }
           
@@ -311,7 +311,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: `🤖 Assigned to @${assignee}`
+              body: '🤖 Assigned to @' + assignee
             });
           }
           
