@@ -2,8 +2,10 @@ name: Security Automation
 
 on:
   schedule:
-    # Run security checks daily at 2:00 AM JST
+    # Run security checks daily at 2:00 AM JST (full scan)
     - cron: '0 17 * * *'  # 17:00 UTC = 2:00 JST
+    # Quick security checks every hour during business hours (9-18 JST)
+    - cron: '0 0-9 * * *'  # 00:00-09:00 UTC = 09:00-18:00 JST
   workflow_dispatch: # Allow manual trigger
   push:
     branches: [main]
