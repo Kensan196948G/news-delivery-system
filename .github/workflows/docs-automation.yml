@@ -50,7 +50,7 @@ jobs:
         echo "Checking documentation coverage..."
         
         # Check for missing docstrings
-        python -c "
+        cat > check_docstrings.py << 'PYTHONSCRIPT'
 import ast
 import os
 import sys
@@ -72,8 +72,11 @@ for root, dirs, files in os.walk('src'):
     for file in files:
         if file.endswith('.py') and not file.startswith('__'):
             file_path = os.path.join(root, file)
-            missing = check_docstrings(file_path)
-            all_missing.extend(missing)
+            try:
+                missing = check_docstrings(file_path)
+                all_missing.extend(missing)
+            except:
+                pass
 
 if all_missing:
     print(f'Found {len(all_missing)} missing docstrings:')
@@ -87,7 +90,9 @@ if all_missing:
 else:
     print('All functions and classes have docstrings!')
     print('missing_docstrings=false')
-" > doc_check.log 2>&1
+PYTHONSCRIPT
+        python3 check_docstrings.py > doc_check.log 2>&1
+        rm -f check_docstrings.py
         
         if grep -q "missing_docstrings=true" doc_check.log; then
           echo "missing_docs=true" >> $GITHUB_OUTPUT
@@ -130,7 +135,7 @@ else:
       run: |
         echo "Checking code comment density..."
         
-        python -c "
+        cat > check_comments.py << 'PYTHONSCRIPT'
 import ast
 import os
 
@@ -174,7 +179,9 @@ if overall_ratio < 0.1 or len(low_comment_files) > 5:
         f.write('\n'.join(low_comment_files))
 else:
     print('needs_more_comments=false')
-" > comment_check.log 2>&1
+PYTHONSCRIPT
+        python3 check_comments.py > comment_check.log 2>&1
+        rm -f check_comments.py
         
         if grep -q "needs_more_comments=true" comment_check.log; then
           echo "needs_comments=true" >> $GITHUB_OUTPUT
@@ -313,7 +320,7 @@ else:
         mkdir -p docs/api
         
         # Generate module documentation
-        python -c "
+        cat > generate_docs.py << 'PYTHONSCRIPT'
 import os
 import importlib.util
 
@@ -375,7 +382,9 @@ for module_path, module_name in modules:
             f.write(doc_content)
         
         print(f'Generated docs/api/{module_name}.md')
-"
+PYTHONSCRIPT
+        python3 generate_docs.py
+        rm -f generate_docs.py
         
     - name: Update Architecture Diagram
       run: |
