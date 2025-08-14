@@ -1,0 +1,62 @@
+name: Test Basic Workflow
+
+on:
+  push:
+    branches:
+      - feature/documentation-improvements
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Test JavaScript in GitHub Script
+      uses: actions/github-script@v7
+      with:
+        script: |
+          console.log('Testing basic JavaScript execution');
+          const testString = 'Hello ' + 'World';
+          console.log(testString);
+          
+          // Test backticks
+          const codeBlock = '```\n' + 
+            'This is a code block\n' + 
+            '```';
+          console.log('Code block test:', codeBlock);
+          
+          // Test GitHub context
+          console.log('Repo:', context.repo.owner + '/' + context.repo.repo);
+          
+          // Test simple object
+          const result = {
+            status: 'success',
+            timestamp: new Date().toISOString()
+          };
+          console.log('Result:', JSON.stringify(result));
+          
+          return result;
+    
+    - name: Test Bash Arrays
+      run: |
+        echo "Testing bash arrays"
+        
+        # Test array definition
+        test_array=("item1" "item2" "item3")
+        
+        # Test array iteration
+        for item in "${test_array[@]}"; do
+          echo "- $item"
+        done
+        
+        # Test array length
+        echo "Array length: ${#test_array[@]}"
+        
+        # Test array expansion
+        echo "All items: ${test_array[*]}"
+    
+    - name: Success Message
+      run: echo "✅ Basic tests completed successfully"

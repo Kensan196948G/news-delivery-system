@@ -113,7 +113,7 @@ jobs:
           issueBody += '**Triggered by:** ' + context.eventName + ' on ' + context.ref + '\n\n';
           
           // Missing docstrings
-          if ('${{ \1 }}' === 'true' && fs.existsSync('missing_docstrings.txt')) {
+          if ('${{ steps.doc_coverage.outputs.missing_docs }}' === 'true' && fs.existsSync('missing_docstrings.txt')) {
             const missingDocs = fs.readFileSync('missing_docstrings.txt', 'utf8').trim().split('\n');
             issueBody += '## 📝 Missing Docstrings\n\n';
             issueBody += 'The following functions and classes are missing docstrings:\n\n';
@@ -129,7 +129,7 @@ jobs:
           }
           
           // Missing README sections
-          if ('${{ \1 }}' === 'true' && fs.existsSync('missing_readme_sections.txt')) {
+          if ('${{ steps.readme_check.outputs.missing_readme_sections }}' === 'true' && fs.existsSync('missing_readme_sections.txt')) {
             const missingSections = fs.readFileSync('missing_readme_sections.txt', 'utf8').trim().split(' ');
             issueBody += '## 📖 Missing README Sections\n\n';
             issueBody += 'Please add the following sections to README.md:\n\n';
@@ -141,7 +141,7 @@ jobs:
           }
           
           // Low comment density
-          if ('${{ \1 }}' === 'true' && fs.existsSync('low_comment_files.txt')) {
+          if ('${{ steps.comments_check.outputs.needs_comments }}' === 'true' && fs.existsSync('low_comment_files.txt')) {
             const lowCommentFiles = fs.readFileSync('low_comment_files.txt', 'utf8').trim().split('\n');
             issueBody += '## 💬 Files Need More Comments\n\n';
             issueBody += 'The following files have low comment density:\n\n';

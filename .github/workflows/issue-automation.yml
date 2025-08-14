@@ -30,7 +30,7 @@ jobs:
           // Analyze issue title and body for automatic labeling
           const title = issue.title.toLowerCase();
           const body = (issue.body || '').toLowerCase();
-          const content = '' + title + ' ' + body + '';
+          const content = title + ' ' + body;
           
           // Auto-labeling based on keywords
           if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
