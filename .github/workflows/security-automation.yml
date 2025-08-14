@@ -49,8 +49,7 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          python -c "
-import json, sys
+          python -c " import json, sys with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
 with open('safety-report.json', 'r') as f:
     data = json.load(f)
     vulns = data.get('vulnerabilities', [])
@@ -145,7 +144,7 @@ with open('bandit-report.json', 'r') as f:
                 if (highSeverity.length > 0) {
                   issueBody += '### HIGH Severity Issues\n';
                   highSeverity.slice(0, 5).forEach(issue => {
-                    issueBody += '- **' + issue.test_name + '** in \'$\{\{issue.filename\}\}:$\{\{issue.line_number\}\}\`\n`;
+                    issueBody += '- **' + issue.test_name + '** in \'$\{\{issue.filename\}\}:$\{\{issue.line_number\}\}\'\n';
                     issueBody += '  ' + issue.issue_text + '\n';
                   });
                   issueBody += '\n';
@@ -154,7 +153,7 @@ with open('bandit-report.json', 'r') as f:
                 if (mediumSeverity.length > 0) {
                   issueBody += '### MEDIUM Severity Issues\n';
                   mediumSeverity.slice(0, 5).forEach(issue => {
-                    issueBody += '- **' + issue.test_name + '** in \'$\{\{issue.filename\}\}:$\{\{issue.line_number\}\}\`\n`;
+                    issueBody += '- **' + issue.test_name + '** in \'$\{\{issue.filename\}\}:$\{\{issue.line_number\}\}\'\n';
                     issueBody += '  ' + issue.issue_text + '\n';
                   });
                   issueBody += '\n';

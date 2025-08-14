@@ -86,7 +86,7 @@ jobs:
           }
           
           // Add welcome comment with guidance
-          const welcomeComment = '👋 Thanks for opening this issue!\n\n🤖 **Auto-triage results:**\n' + labels.length > 0 ? `- Labels added: $\{\{labels.join(', ') + '' : '- No automatic labels applied'\}\}
+          const welcomeComment = '👋 Thanks for opening this issue!\n\n🤖 **Auto-triage results:**\n' + labels.length > 0 ? '- Labels added: $\{\{labels.join(', ') + '' : '- No automatic labels applied'\}\}
 $\{\{assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') + '' : ''\}\}
 
 📋 **Next steps:**
