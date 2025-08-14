@@ -51,7 +51,7 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          cat > parse_safety.py << 'SCRIPT'
+          cat > parse_safety.py << 'PYTHONSCRIPT'
 import json, sys
 with open('safety-report.json', 'r') as f:
     data = json.load(f)
@@ -63,7 +63,7 @@ with open('safety-report.json', 'r') as f:
         sys.exit(1)
     else:
         print('No vulnerabilities found')
-SCRIPT
+PYTHONSCRIPT
           python3 parse_safety.py || echo "safety_issues=true" >> $GITHUB_OUTPUT
           rm -f parse_safety.py
         fi
@@ -76,7 +76,7 @@ SCRIPT
         
         if [ -f bandit-report.json ]; then
           # Parse bandit report
-          cat > parse_bandit.py << 'SCRIPT'
+          cat > parse_bandit.py << 'PYTHONSCRIPT'
 import json, sys
 with open('bandit-report.json', 'r') as f:
     data = json.load(f)
@@ -94,7 +94,7 @@ with open('bandit-report.json', 'r') as f:
         sys.exit(1)
     else:
         print('No high/medium security issues found')
-SCRIPT
+PYTHONSCRIPT
           python3 parse_bandit.py || echo "bandit_issues=true" >> $GITHUB_OUTPUT
           rm -f parse_bandit.py
         fi
