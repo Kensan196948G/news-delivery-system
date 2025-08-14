@@ -33,12 +33,37 @@ class HTMLReportGenerator:
         
         if os.path.exists(template_dir):
             self.env = Environment(loader=FileSystemLoader(template_dir))
+            # カスタムフィルターを追加
+            self.env.filters['strftime'] = self._strftime_filter
         else:
             # フォールバック: インラインテンプレート使用
             self.env = Environment()
+            self.env.filters['strftime'] = self._strftime_filter
             logger.warning(f"Template directory not found: {template_dir}. Using inline templates.")
         
         logger.info("HTML Report Generator initialized")
+    
+    def _strftime_filter(self, date, format='%Y-%m-%d %H:%M'):
+        """Jinja2用のstrftimeフィルター"""
+        if date is None:
+            return ''
+        
+        # 文字列の場合、datetimeオブジェクトに変換
+        if isinstance(date, str):
+            try:
+                # ISO形式の日付文字列をパース
+                if 'T' in date:
+                    date = datetime.fromisoformat(date.replace('Z', '+00:00'))
+                else:
+                    date = datetime.strptime(date, '%Y-%m-%d')
+            except ValueError:
+                return date  # 変換できない場合はそのまま返す
+        
+        # datetimeオブジェクトの場合、フォーマット
+        if hasattr(date, 'strftime'):
+            return date.strftime(format)
+        
+        return str(date)
     
     def generate_daily_report(self, articles: List[Article], 
                             report_date: datetime = None) -> str:

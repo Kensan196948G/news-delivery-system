@@ -27,6 +27,9 @@ try:
     GOOGLE_APIS_AVAILABLE = True
 except ImportError:
     GOOGLE_APIS_AVAILABLE = False
+    # Define placeholder classes when Google APIs are not available
+    class Credentials:
+        pass
 
 from models.article import Article
 from utils.config import get_config
