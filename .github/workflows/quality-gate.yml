@@ -162,64 +162,64 @@ jobs:
         
     - name: Create Quality Gate Report
       run: |
-        cat > temp_file.txt << 'HEREDOC_END'
-        # 🔍 Quality Gate Report
-        
-        **Build:** ${{ github.event.workflow_run.html_url }}
-        **Commit:** ${{ github.event.workflow_run.head_sha }}
-        **Branch:** ${{ github.event.workflow_run.head_branch }}
-        **Timestamp:** $(date -u)
-        
-        ## 📊 Overall Result
-        
-        | Metric | Result |
-        |--------|--------|
-        | **Quality Gate** | ${{ steps.quality-check.outputs.quality_gate }} |
-        | **Quality Score** | ${{ steps.quality-check.outputs.quality_score }}/100 |
-        | **Total Issues** | ${{ steps.quality-check.outputs.total_issues }} |
-        | **Critical Issues** | ${{ steps.quality-check.outputs.critical_issues }} |
-        
-        ## 🎯 Quality Standards
-        
-        ✅ **Passed**: No critical issues, ≤ 5 total issues
-        ⚠️  **Warning**: No critical issues, ≤ 10 total issues  
-        ❌ **Failed**: Critical issues present or > 10 total issues
-        
-        ## 📋 Recommendations
-        
-        EOF
+        {
+          echo "# 🔍 Quality Gate Report"
+          echo ""
+          echo "**Build:** ${{ github.event.workflow_run.html_url }}"
+          echo "**Commit:** ${{ github.event.workflow_run.head_sha }}"
+          echo "**Branch:** ${{ github.event.workflow_run.head_branch }}"
+          echo "**Timestamp:** $(date -u)"
+          echo ""
+          echo "## 📊 Overall Result"
+          echo ""
+          echo "| Metric | Result |"
+          echo "|--------|--------|"
+          echo "| **Quality Gate** | ${{ steps.quality-check.outputs.quality_gate }} |"
+          echo "| **Quality Score** | ${{ steps.quality-check.outputs.quality_score }}/100 |"
+          echo "| **Total Issues** | ${{ steps.quality-check.outputs.total_issues }} |"
+          echo "| **Critical Issues** | ${{ steps.quality-check.outputs.critical_issues }} |"
+          echo ""
+          echo "## 🎯 Quality Standards"
+          echo ""
+          echo "✅ **Passed**: No critical issues, ≤ 5 total issues"
+          echo "⚠️  **Warning**: No critical issues, ≤ 10 total issues"
+          echo "❌ **Failed**: Critical issues present or > 10 total issues"
+          echo ""
+          echo "## 📋 Recommendations"
+          echo ""
+        } > quality-gate-report.md
         
         if [ "${{ steps.quality-check.outputs.quality_gate }}" = "FAILED" ]; then
-          cat >> quality-gate-report.md << 'EOF'
-        
-        ### 🚨 Critical Actions Required
-        
-        - Address all critical security vulnerabilities
-        - Fix high-severity security issues
-        - Review and resolve dependency vulnerabilities
-        - **Deployment is blocked until issues are resolved**
-        
-        EOF
+          {
+            echo ""
+            echo "### 🚨 Critical Actions Required"
+            echo ""
+            echo "- Address all critical security vulnerabilities"
+            echo "- Fix high-severity security issues"
+            echo "- Review and resolve dependency vulnerabilities"
+            echo "- **Deployment is blocked until issues are resolved**"
+            echo ""
+          } >> quality-gate-report.md
         elif [ "${{ steps.quality-check.outputs.quality_gate }}" = "WARNING" ]; then
-          cat >> quality-gate-report.md << 'EOF'
-        
-        ### ⚠️ Improvements Recommended
-        
-        - Review and address medium-severity issues
-        - Consider updating dependencies with known vulnerabilities
-        - Monitor quality trends to prevent degradation
-        
-        EOF
+          {
+            echo ""
+            echo "### ⚠️ Improvements Recommended"
+            echo ""
+            echo "- Review and address medium-severity issues"
+            echo "- Consider updating dependencies with known vulnerabilities"
+            echo "- Monitor quality trends to prevent degradation"
+            echo ""
+          } >> quality-gate-report.md
         else
-          cat >> quality-gate-report.md << 'EOF'
-        
-        ### ✅ Quality Standards Met
-        
-        - All quality checks passed
-        - No critical issues detected
-        - Ready for deployment
-        
-        EOF
+          {
+            echo ""
+            echo "### ✅ Quality Standards Met"
+            echo ""
+            echo "- All quality checks passed"
+            echo "- No critical issues detected"
+            echo "- Ready for deployment"
+            echo ""
+          } >> quality-gate-report.md
         fi
         
         echo "Quality Gate Report:"

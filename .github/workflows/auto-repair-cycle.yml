@@ -245,15 +245,7 @@ GITIGNORE_CONTENT
         # 変更コミット
         if [ ${#CHANGES_MADE[@]} -gt 0 ]; then
           git add -A
-          git commit -m "🤖 自動修復: $(IFS=,; echo "${CHANGES_MADE[*]}")
-
-自動検知・修復サイクルによる問題解決:
-$(printf '- %s\n' "${CHANGES_MADE[@]}")
-
-実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST')
-修復タイプ: 完全自動化
-
-🤖 Generated with [Claude Code](https://claude.ai/code)"
+          git commit -m "🤖 自動修復: $(IFS=,; echo "${CHANGES_MADE[*]}") | 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | 修復タイプ: 完全自動化 | 🤖 Generated with Claude Code"
 
           REPAIR_SUCCESSFUL=true
           PR_NEEDED=true
