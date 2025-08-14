@@ -72,14 +72,7 @@ jobs:
             done
             
             # バッチコミット
-            git commit -m "feat: バッチ${batch_count} - 機能追加・改善
-
-ファイル数: ${#batch_files[@]}
-内容: $(IFS=,; echo \"${batch_files[*]}\")
-
-レート制限対策: スマートコミット戦略適用
-
-🤖 Generated with [Claude Code](https://claude.ai/code)"
+            git commit -m "feat: バッチ${batch_count} - 機能追加・改善 | ファイル数: ${#batch_files[@]} | レート制限対策: スマートコミット戦略適用 | 🤖 Generated with Claude Code"
             echo "✅ バッチ ${batch_count} コミット完了"
             
             # CodeRabbit AI レート制限対策の待機
