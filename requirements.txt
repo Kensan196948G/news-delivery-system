@@ -1,45 +1,21 @@
-# News Delivery System Requirements - CLAUDE.md仕様準拠
+# News Delivery System Requirements - 修正版
 # ニュース自動配信システム依存関係
-
-# FastAPI Framework - FastAPIフレームワーク
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-pydantic>=2.4.0
 
 # Core dependencies - 基本依存関係
 python-dotenv>=1.0.0
-asyncio-compat>=0.1.2
-
-# Redis Cache - Redisキャッシュ
-redis>=5.0.0
-aioredis>=2.0.1
-
-# Async Database - 非同期データベース
-aiosqlite>=0.19.0
-databases[sqlite]>=0.8.0
-sqlalchemy>=2.0.0
-alembic>=1.12.0
-
-# Security & Authentication - セキュリティ・認証
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-multipart>=0.0.6
 
 # HTTP client - HTTPクライアント
 aiohttp>=3.9.0
 requests>=2.31.0
 
 # Translation API - 翻訳API
-# DeepL API integration
+deepl>=1.12.0
 
 # Claude AI API - AI分析
 anthropic>=0.18.0
 
 # News APIs - ニュースAPI
 newsapi-python>=0.2.6
-# GNews API (requests経由)
-
-# NVD API (requests経由でアクセス)
 
 # Gmail API - メール送信
 google-api-python-client>=2.100.0
@@ -47,16 +23,8 @@ google-auth>=2.23.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.2.0
 
-# PDF generation - PDF生成 (wkhtmltopdf使用)
-# wkhtmltopdf must be installed separately
-# Windows: Download from https://wkhtmltopdf.org/downloads.html
-# Linux: sudo apt-get install wkhtmltopdf
-
 # HTML template processing - HTMLテンプレート
 jinja2>=3.1.2
-
-# JSON handling - JSON処理
-# Built-in json module
 
 # Date/Time handling - 日時処理
 python-dateutil>=2.8.0
@@ -64,36 +32,31 @@ python-dateutil>=2.8.0
 # Logging - ログ処理
 colorlog>=6.7.0
 
-# Async support - 非同期サポート
-asyncio>=3.4.3
-
-# Configuration management - 設定管理
-# Built-in configparser
-
-# Database - データベース (SQLite)
-# Built-in sqlite3
-
-# Cache management - キャッシュ管理
-# Custom implementation using SQLite
-
-# Rate limiting - レート制限
-# Custom implementation
-
 # Security - セキュリティ
 cryptography>=41.0.0
 
-# Development dependencies - 開発用依存関係
+# Data processing - データ処理
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Email validation - メール検証
+email-validator>=2.0.0
+
+# YAML processing - YAML処理
+pyyaml>=6.0
+
+# CLI utilities - CLI ユーティリティ
+click>=8.1.0
+
+# Testing - テスト
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 
 # Code quality - コード品質
 black>=23.0.0
 flake8>=6.0.0
+mypy>=1.5.0
 
-# Windows Task Scheduler integration
-# Built-in subprocess module for PowerShell integration
-
-# Additional utilities - 追加ユーティリティ
-hashlib>=3.2.0  # Built-in
-pathlib>=1.0.0  # Built-in
-dataclasses>=0.8  # Built-in for Python 3.7+
+# Security scanning - セキュリティスキャン
+safety>=2.3.0
+bandit>=1.7.0
