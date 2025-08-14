@@ -50,7 +50,7 @@ jobs:
         echo "Checking documentation coverage..."
         
         # Check for missing docstrings
-        cat > check_docstrings.py <<'EOF'
+        python3 > doc_check.log 2>&1 << 'DOCSTRING_CHECK_PY'
 import ast
 import os
 import sys
@@ -90,9 +90,7 @@ if all_missing:
 else:
     print('All functions and classes have docstrings!')
     print('missing_docstrings=false')
-HEREDOC_END
-        python3 check_docstrings.py > doc_check.log 2>&1
-        rm -f check_docstrings.py
+DOCSTRING_CHECK_PY
         
         if grep -q "missing_docstrings=true" doc_check.log; then
           echo "missing_docs=true" >> $GITHUB_OUTPUT
