@@ -2,10 +2,9 @@ name: Continuous Monitoring
 
 on:
   schedule:
-    # 30分おきに実行 (毎時0分と30分)
-    - cron: '0,30 * * * *'
-    # 代替オプション: 1時間おきの場合は以下を使用
-    # - cron: '0 * * * *'
+    # 1時間おきに実行 (新仕様: 1時間以内検知保証)
+    - cron: '0 * * * *'
+    # 完全自動フローと連携
   
   workflow_dispatch: # 手動実行可能
     inputs:
