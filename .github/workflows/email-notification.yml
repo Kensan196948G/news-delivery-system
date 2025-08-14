@@ -51,7 +51,8 @@ jobs:
           # テストメール
           SUBJECT="🧪 テスト通知 - ニュース配信システム"
           RECIPIENT="${{ github.event.inputs.test_email }}"
-          BODY="🧪 メール通知テスト
+          BODY=$(cat << 'EMAIL_BODY'
+🧪 メール通知テスト
 
 送信時刻: ${TIMESTAMP}
 システム: ニュース配信システム
@@ -60,7 +61,9 @@ jobs:
 これはメール通知機能のテストです。
 自動フロー成功時にこのような通知が送信されます。
 
-🤖 自動通知システム"
+🤖 自動通知システム
+EMAIL_BODY
+          )
         else
           # 実際の通知
           SUBJECT="${{ inputs.subject }}"

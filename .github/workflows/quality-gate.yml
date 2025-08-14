@@ -162,7 +162,7 @@ jobs:
         
     - name: Create Quality Gate Report
       run: |
-        cat > quality-gate-report.md << 'EOF'
+        cat > temp_file.txt << 'HEREDOC_END'
         # 🔍 Quality Gate Report
         
         **Build:** ${{ github.event.workflow_run.html_url }}

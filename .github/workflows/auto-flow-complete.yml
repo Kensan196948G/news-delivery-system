@@ -121,22 +121,22 @@ jobs:
         echo "- 重要度: $SEVERITY_LEVEL"
         
         # 検知結果をファイルに保存
-        cat > detection-report.txt << EOF
-自動検知レポート
-===============
-検知時刻: $(date '+%Y-%m-%d %H:%M:%S JST')
-問題検出: $PROBLEMS_DETECTED
-重要度レベル: $SEVERITY_LEVEL
-
-検出内容:
-$(printf '%s\n' "${DETECTION_RESULTS[@]}")
-
-システム状態:
-- セキュリティ: $([ "$PROBLEMS_DETECTED" = "true" ] && echo "要注意" || echo "正常")
-- コード品質: 検査済み
-- 依存関係: 検査済み
-- ファイル整合性: 検査済み
-EOF
+        {
+          echo "自動検知レポート"
+          echo "==============="
+          echo "検知時刻: $(date '+%Y-%m-%d %H:%M:%S JST')"
+          echo "問題検出: $PROBLEMS_DETECTED"
+          echo "重要度レベル: $SEVERITY_LEVEL"
+          echo ""
+          echo "検出内容:"
+          printf '%s\n' "${DETECTION_RESULTS[@]}"
+          echo ""
+          echo "システム状態:"
+          echo "- セキュリティ: $([ "$PROBLEMS_DETECTED" = "true" ] && echo "要注意" || echo "正常")"
+          echo "- コード品質: 検査済み"
+          echo "- 依存関係: 検査済み"
+          echo "- ファイル整合性: 検査済み"
+        } > detection-report.txt
 
   # 📝 Phase 2: Issue自動作成
   auto-issue-creation:
@@ -272,7 +272,7 @@ EOF
         # 4. 設定ファイル修復
         if [ ! -f ".gitignore" ]; then
           echo "📁 .gitignore復元中..."
-          cat > .gitignore << 'EOF'
+          cat > temp_file.txt << 'HEREDOC_END'
 __pycache__/
 *.pyc
 *.pyo
@@ -284,7 +284,7 @@ dist/
 build/
 *.egg-info/
 .DS_Store
-EOF
+HEREDOC_END
           REPAIR_ACTIONS+=("設定ファイル復元")
         fi
         

@@ -225,7 +225,7 @@ jobs:
           fi
           
           if [ ! -f ".gitignore" ]; then
-            cat > .gitignore << 'EOF'
+            cat > .gitignore << 'GITIGNORE_CONTENT'
 __pycache__/
 *.pyc
 .env
@@ -235,7 +235,7 @@ htmlcov/
 dist/
 build/
 *.egg-info/
-EOF
+GITIGNORE_CONTENT
             CHANGES_MADE+=("gitignore_restore")
           fi
           

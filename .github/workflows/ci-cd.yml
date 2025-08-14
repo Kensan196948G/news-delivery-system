@@ -268,7 +268,7 @@ jobs:
         cp -r scripts/ deploy/ 2>/dev/null || echo "Scripts directory not found"
         
         # Create startup script
-        cat > deploy/start.sh << 'EOF'
+        cat > temp_file.txt << 'HEREDOC_END'
         #!/bin/bash
         cd "$(dirname "$0")"
         python -m pip install -r requirements.txt

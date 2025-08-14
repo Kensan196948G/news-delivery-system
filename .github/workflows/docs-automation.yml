@@ -50,7 +50,7 @@ jobs:
         echo "Checking documentation coverage..."
         
         # Check for missing docstrings
-        cat > check_docstrings.py << 'PYTHONSCRIPT'
+        cat > check_docstrings.py <<'EOF'
 import ast
 import os
 import sys
@@ -90,7 +90,7 @@ if all_missing:
 else:
     print('All functions and classes have docstrings!')
     print('missing_docstrings=false')
-PYTHONSCRIPT
+HEREDOC_END
         python3 check_docstrings.py > doc_check.log 2>&1
         rm -f check_docstrings.py
         
@@ -390,7 +390,7 @@ PYTHONSCRIPT
       run: |
         echo "Updating architecture documentation..."
         
-        cat > docs/ARCHITECTURE.md << 'EOF'
+        cat > temp_file.txt << 'HEREDOC_END'
 # System Architecture
 
 ## Overview
@@ -464,7 +464,7 @@ The News Delivery System is designed as a modular, event-driven architecture tha
 - Security scanning and dependency updates
 - Multiple deployment environments supported
 
-EOF
+HEREDOC_END
         
     - name: Commit Generated Documentation
       run: |
