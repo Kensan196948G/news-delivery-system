@@ -261,34 +261,26 @@ jobs:
         # 4. 設定ファイル修復
         if [ ! -f ".gitignore" ]; then
           echo "📁 .gitignore復元中..."
-          cat > .gitignore << 'EOF'
-__pycache__/
-*.pyc
-*.pyo
-.env
-.pytest_cache/
-.coverage
-htmlcov/
-dist/
-build/
-*.egg-info/
-.DS_Store
-EOF
+          {
+            echo "__pycache__/"
+            echo "*.pyc"
+            echo "*.pyo"
+            echo ".env"
+            echo ".pytest_cache/"
+            echo ".coverage"
+            echo "htmlcov/"
+            echo "dist/"
+            echo "build/"
+            echo "*.egg-info/"
+            echo ".DS_Store"
+          } > .gitignore
           REPAIR_ACTIONS+=("設定ファイル復元")
         fi
         
         # 修復結果確認
         if [ ${#REPAIR_ACTIONS[@]} -gt 0 ]; then
           git add -A
-          git commit -m "🤖 自動修復: $(IFS=,; echo "${REPAIR_ACTIONS[*]}")
-
-自動検知→修復フローによる問題解決:
-$(printf '- %s\n' "${REPAIR_ACTIONS[@]}")
-
-修復時刻: $(date '+%Y-%m-%d %H:%M:%S JST')
-Issue: #${{ needs.auto-issue-creation.outputs.issue_number }}
-
-🤖 Generated with [Claude Code](https://claude.ai/code)"
+          git commit -m "🤖 自動修復: $(IFS=,; echo "${REPAIR_ACTIONS[*]}") | 修復時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | Issue: #${{ needs.auto-issue-creation.outputs.issue_number }} | 🤖 Generated with Claude Code"
 
           REPAIR_SUCCESSFUL=true
           echo "✅ 自動修復完了"
