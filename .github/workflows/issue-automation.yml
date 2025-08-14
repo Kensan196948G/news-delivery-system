@@ -1,0 +1,304 @@
+name: Issue Automation
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  auto-triage:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    
+    steps:
+    - name: Auto-triage New Issues
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const issue = context.payload.issue;
+          
+          let labels = [];
+          let assignees = [];
+          
+          // Analyze issue title and body for automatic labeling
+          const title = issue.title.toLowerCase();
+          const body = (issue.body || '').toLowerCase();
+          const content = `${title} ${body}`;
+          
+          // Auto-labeling based on keywords
+          if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
+            labels.push('bug');
+          }
+          if (content.includes('feature') || content.includes('enhancement') || content.includes('improve')) {
+            labels.push('enhancement');
+          }
+          if (content.includes('documentation') || content.includes('docs') || content.includes('readme')) {
+            labels.push('documentation');
+          }
+          if (content.includes('security') || content.includes('vulnerability') || content.includes('cve')) {
+            labels.push('security');
+          }
+          if (content.includes('ci/cd') || content.includes('github actions') || content.includes('workflow')) {
+            labels.push('ci/cd');
+          }
+          if (content.includes('setup') || content.includes('installation') || content.includes('configuration')) {
+            labels.push('setup');
+          }
+          
+          // Priority labeling
+          if (content.includes('urgent') || content.includes('critical') || content.includes('security')) {
+            labels.push('priority/high');
+          } else if (content.includes('important') || content.includes('soon')) {
+            labels.push('priority/medium');
+          } else {
+            labels.push('priority/low');
+          }
+          
+          // Apply labels
+          if (labels.length > 0) {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: labels
+            });
+          }
+          
+          // Auto-assign based on issue type
+          if (labels.includes('security')) {
+            assignees.push(context.repo.owner);
+          }
+          
+          if (assignees.length > 0) {
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              assignees: assignees
+            });
+          }
+          
+          // Add welcome comment with guidance
+          const welcomeComment = `👋 Thanks for opening this issue!
+
+🤖 **Auto-triage results:**
+${labels.length > 0 ? `- Labels added: ${labels.join(', ')}` : '- No automatic labels applied'}
+${assignees.length > 0 ? `- Auto-assigned to: ${assignees.join(', ')}` : ''}
+
+📋 **Next steps:**
+- A maintainer will review this issue shortly
+- Please ensure all required information is provided
+- Check if similar issues already exist
+
+💡 **Tips:**
+- Add \`[HIGH PRIORITY]\` to title for urgent issues
+- Include steps to reproduce for bugs
+- Provide examples for feature requests`;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue.number,
+            body: welcomeComment
+          });
+
+  auto-close-stale:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'labeled' && contains(github.event.label.name, 'stale')
+    
+    steps:
+    - name: Auto-close Stale Issues
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const issue = context.payload.issue;
+          
+          // Check if issue has been inactive for 7 days after stale label
+          const now = new Date();
+          const labeledDate = new Date(context.payload.label.created_at || now);
+          const daysSinceLabeled = (now - labeledDate) / (1000 * 60 * 60 * 24);
+          
+          if (daysSinceLabeled >= 7) {
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              state: 'closed'
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: '🤖 This issue has been automatically closed due to inactivity. If this issue is still relevant, please reopen it or create a new issue with updated information.'
+            });
+          }
+
+  duplicate-detector:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    
+    steps:
+    - name: Detect Duplicate Issues
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const issue = context.payload.issue;
+          
+          // Search for similar issues
+          const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue "${issue.title.substring(0, 50)}"`;
+          
+          const { data: searchResults } = await github.rest.search.issuesAndPullRequests({
+            q: query,
+            sort: 'relevance',
+            order: 'desc'
+          });
+          
+          // Filter out current issue and find potential duplicates
+          const potentialDuplicates = searchResults.items
+            .filter(item => item.number !== issue.number && item.state === 'open')
+            .slice(0, 3);
+          
+          if (potentialDuplicates.length > 0) {
+            const duplicateList = potentialDuplicates
+              .map(item => `- #${item.number}: ${item.title}`)
+              .join('\n');
+            
+            const comment = `🔍 **Potential duplicate issues detected:**
+
+${duplicateList}
+
+Please check if your issue is already covered by one of the above. If this is a different issue, please provide more specific details to help distinguish it.
+
+If this is indeed a duplicate, please:
+1. Add your use case details to the existing issue
+2. Close this issue
+3. Subscribe to the existing issue for updates`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: comment
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['needs-triage']
+            });
+          }
+
+  auto-link-pr:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' && contains(github.event.issue.body, 'fix #')
+    
+    steps:
+    - name: Auto-link PRs to Issues
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const issue = context.payload.issue;
+          
+          // Extract issue numbers from PR body
+          const issueNumbers = [...(issue.body || '').matchAll(/(?:fix|fixes|close|closes)\s+#(\d+)/gi)]
+            .map(match => parseInt(match[1]));
+          
+          if (issueNumbers.length > 0) {
+            const linkedIssues = issueNumbers.map(num => `#${num}`).join(', ');
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `🔗 This issue is linked to: ${linkedIssues}\n\n🤖 Automatic linking detected. This issue will be closed when the linked PR is merged.`
+            });
+          }
+
+  command-processor:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'created' && github.event.issue
+    
+    steps:
+    - name: Process Issue Commands
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { context } = require('@actions/github');
+          const comment = context.payload.comment;
+          const issue = context.payload.issue;
+          
+          // Only process commands from repo owner or collaborators
+          const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            username: comment.user.login
+          });
+          
+          if (!['admin', 'write'].includes(permission.permission)) {
+            return;
+          }
+          
+          const body = comment.body.trim();
+          
+          // Process commands
+          if (body.startsWith('/label ')) {
+            const labels = body.substring(7).split(' ').filter(l => l.length > 0);
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: labels
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `🤖 Added labels: ${labels.join(', ')}`
+            });
+          }
+          
+          if (body === '/close') {
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              state: 'closed'
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: '🤖 Issue closed by command'
+            });
+          }
+          
+          if (body.startsWith('/assign ')) {
+            const assignee = body.substring(8).trim().replace('@', '');
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              assignees: [assignee]
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `🤖 Assigned to @${assignee}`
+            });
+          }

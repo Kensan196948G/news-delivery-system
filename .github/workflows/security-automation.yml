@@ -1,0 +1,293 @@
+name: Security Automation
+
+on:
+  schedule:
+    # Run security checks daily at 2:00 AM JST
+    - cron: '0 17 * * *'  # 17:00 UTC = 2:00 JST
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [main]
+    paths:
+      - 'requirements*.txt'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+  issues: write
+  security-events: write
+  pull-requests: write
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit pip-audit
+        
+        # Install project dependencies for scanning
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+        if [ -f requirements-dev.txt ]; then
+          pip install -r requirements-dev.txt
+        fi
+        
+    - name: Run Safety Check
+      id: safety
+      run: |
+        echo "Running safety check..."
+        safety check --json --output safety-report.json || echo "safety_issues=true" >> $GITHUB_OUTPUT
+        
+        if [ -f safety-report.json ]; then
+          # Parse safety report for vulnerabilities
+          python -c "
+import json, sys
+with open('safety-report.json', 'r') as f:
+    data = json.load(f)
+    vulns = data.get('vulnerabilities', [])
+    if vulns:
+        print(f'Found {len(vulns)} vulnerabilities')
+        for vuln in vulns[:5]:  # Show first 5
+            print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
+        sys.exit(1)
+    else:
+        print('No vulnerabilities found')
+" || echo "safety_issues=true" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Run Bandit Security Scan
+      id: bandit
+      run: |
+        echo "Running bandit scan..."
+        bandit -r src/ -f json -o bandit-report.json || echo "bandit_issues=true" >> $GITHUB_OUTPUT
+        
+        if [ -f bandit-report.json ]; then
+          # Parse bandit report
+          python -c "
+import json, sys
+with open('bandit-report.json', 'r') as f:
+    data = json.load(f)
+    results = data.get('results', [])
+    high_severity = [r for r in results if r.get('issue_severity') == 'HIGH']
+    medium_severity = [r for r in results if r.get('issue_severity') == 'MEDIUM']
+    
+    if high_severity:
+        print(f'Found {len(high_severity)} HIGH severity issues')
+        for issue in high_severity[:3]:
+            print(f'- {issue.get(\"test_name\", \"unknown\")}: {issue.get(\"issue_text\", \"\")}')
+        sys.exit(1)
+    elif medium_severity:
+        print(f'Found {len(medium_severity)} MEDIUM severity issues')
+        sys.exit(1)
+    else:
+        print('No high/medium security issues found')
+" || echo "bandit_issues=true" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Run pip-audit
+      id: pip_audit
+      run: |
+        echo "Running pip-audit..."
+        pip-audit --format=json --output=pip-audit-report.json || echo "pip_audit_issues=true" >> $GITHUB_OUTPUT
+        
+    - name: Create Security Issue
+      if: steps.safety.outputs.safety_issues == 'true' || steps.bandit.outputs.bandit_issues == 'true' || steps.pip_audit.outputs.pip_audit_issues == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let issueBody = '# 🚨 Security Alert - Automated Scan Results\n\n';
+          issueBody += `**Scan Date:** ${new Date().toISOString()}\n`;
+          issueBody += `**Triggered by:** ${context.eventName}\n\n`;
+          
+          // Safety report
+          if (fs.existsSync('safety-report.json')) {
+            try {
+              const safetyData = JSON.parse(fs.readFileSync('safety-report.json', 'utf8'));
+              const vulns = safetyData.vulnerabilities || [];
+              
+              if (vulns.length > 0) {
+                issueBody += '## 🔍 Dependency Vulnerabilities (Safety)\n\n';
+                vulns.slice(0, 10).forEach(vuln => {
+                  issueBody += `### ${vuln.package_name} v${vuln.installed_version}\n`;
+                  issueBody += `- **Vulnerability ID:** ${vuln.vulnerability_id}\n`;
+                  issueBody += `- **Severity:** ${vuln.CVE || 'Unknown'}\n`;
+                  issueBody += `- **Description:** ${vuln.advisory}\n`;
+                  issueBody += `- **Recommended:** Update to v${vuln.closest_versions_without_known_vulnerabilities?.[0] || 'latest'}\n\n`;
+                });
+              }
+            } catch (e) {
+              issueBody += '## ❌ Safety Report Parse Error\n\n';
+            }
+          }
+          
+          // Bandit report
+          if (fs.existsSync('bandit-report.json')) {
+            try {
+              const banditData = JSON.parse(fs.readFileSync('bandit-report.json', 'utf8'));
+              const results = banditData.results || [];
+              const highSeverity = results.filter(r => r.issue_severity === 'HIGH');
+              const mediumSeverity = results.filter(r => r.issue_severity === 'MEDIUM');
+              
+              if (highSeverity.length > 0 || mediumSeverity.length > 0) {
+                issueBody += '## 🔒 Code Security Issues (Bandit)\n\n';
+                
+                if (highSeverity.length > 0) {
+                  issueBody += '### HIGH Severity Issues\n';
+                  highSeverity.slice(0, 5).forEach(issue => {
+                    issueBody += `- **${issue.test_name}** in \`${issue.filename}:${issue.line_number}\`\n`;
+                    issueBody += `  ${issue.issue_text}\n`;
+                  });
+                  issueBody += '\n';
+                }
+                
+                if (mediumSeverity.length > 0) {
+                  issueBody += '### MEDIUM Severity Issues\n';
+                  mediumSeverity.slice(0, 5).forEach(issue => {
+                    issueBody += `- **${issue.test_name}** in \`${issue.filename}:${issue.line_number}\`\n`;
+                    issueBody += `  ${issue.issue_text}\n`;
+                  });
+                  issueBody += '\n';
+                }
+              }
+            } catch (e) {
+              issueBody += '## ❌ Bandit Report Parse Error\n\n';
+            }
+          }
+          
+          // pip-audit report
+          if (fs.existsSync('pip-audit-report.json')) {
+            try {
+              const auditData = JSON.parse(fs.readFileSync('pip-audit-report.json', 'utf8'));
+              if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
+                issueBody += '## 📦 Package Audit Issues (pip-audit)\n\n';
+                auditData.vulnerabilities.slice(0, 5).forEach(vuln => {
+                  issueBody += `- **${vuln.package}** v${vuln.installed_version}\n`;
+                  issueBody += `  ID: ${vuln.id}, Fixed in: ${vuln.fixed_versions?.join(', ') || 'Unknown'}\n`;
+                });
+              }
+            } catch (e) {
+              issueBody += '## ❌ pip-audit Report Parse Error\n\n';
+            }
+          }
+          
+          issueBody += '\n## 🛠️ Recommended Actions\n\n';
+          issueBody += '1. Review all identified vulnerabilities\n';
+          issueBody += '2. Update vulnerable dependencies to secure versions\n';
+          issueBody += '3. Fix code security issues identified by Bandit\n';
+          issueBody += '4. Re-run security scans to verify fixes\n';
+          issueBody += '5. Consider adding security tests to prevent regression\n\n';
+          issueBody += '## 📊 Reports\n\n';
+          issueBody += 'Detailed reports are available in the workflow artifacts.\n\n';
+          issueBody += '---\n';
+          issueBody += '🤖 This issue was automatically created by the security automation workflow.';
+          
+          // Check if similar security issue already exists (last 7 days)
+          const { data: existingIssues } = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'security',
+            state: 'open',
+            since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+          });
+          
+          const securityIssues = existingIssues.filter(issue => 
+            issue.title.includes('Security Alert') || issue.title.includes('🚨')
+          );
+          
+          if (securityIssues.length === 0) {
+            // Create new security issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Security Alert - Vulnerabilities Detected',
+              body: issueBody,
+              labels: ['security', 'priority/high', 'automated']
+            });
+          } else {
+            // Update existing security issue
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: securityIssues[0].number,
+              body: '🔄 **Updated Security Scan Results**\n\n' + issueBody
+            });
+          }
+          
+    - name: Upload Security Reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          bandit-report.json
+          pip-audit-report.json
+        retention-days: 30
+
+  codeql-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: python
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      
+    - name: Create CodeQL Issue on Findings
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🔍 CodeQL Security Analysis - Issues Found',
+            body: `# CodeQL Security Analysis Results
+
+**Analysis Date:** ${new Date().toISOString()}
+
+CodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.
+
+## Next Steps
+1. Go to the **Security** tab in this repository
+2. Review **Code scanning alerts**
+3. Address any identified vulnerabilities
+4. Re-run the analysis to verify fixes
+
+---
+🤖 This issue was automatically created by CodeQL analysis.`,
+            labels: ['security', 'codeql', 'automated']
+          });
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: critical
+        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+        deny-licenses: GPL-2.0, GPL-3.0

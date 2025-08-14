@@ -1,0 +1,500 @@
+name: Documentation Automation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**/*.py'
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**/*.py'
+      - 'docs/**'
+      - '*.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  docs-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pydocstyle pylint sphinx sphinx-rtd-theme
+        
+    - name: Check Documentation Coverage
+      id: doc_coverage
+      run: |
+        echo "Checking documentation coverage..."
+        
+        # Check for missing docstrings
+        python -c "
+import ast
+import os
+import sys
+
+def check_docstrings(file_path):
+    with open(file_path, 'r') as f:
+        tree = ast.parse(f.read())
+    
+    missing_docs = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            if not ast.get_docstring(node):
+                missing_docs.append(f'{file_path}:{node.lineno} - {node.name}')
+    return missing_docs
+
+all_missing = []
+for root, dirs, files in os.walk('src'):
+    dirs[:] = [d for d in dirs if d != '__pycache__']
+    for file in files:
+        if file.endswith('.py') and not file.startswith('__'):
+            file_path = os.path.join(root, file)
+            missing = check_docstrings(file_path)
+            all_missing.extend(missing)
+
+if all_missing:
+    print(f'Found {len(all_missing)} missing docstrings:')
+    for item in all_missing[:20]:  # Show first 20
+        print(f'  {item}')
+    
+    with open('missing_docstrings.txt', 'w') as f:
+        f.write('\n'.join(all_missing))
+    
+    print('missing_docstrings=true')
+else:
+    print('All functions and classes have docstrings!')
+    print('missing_docstrings=false')
+" > doc_check.log 2>&1
+        
+        if grep -q "missing_docstrings=true" doc_check.log; then
+          echo "missing_docs=true" >> $GITHUB_OUTPUT
+        else
+          echo "missing_docs=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Check README.md Completeness
+      id: readme_check
+      run: |
+        echo "Checking README.md completeness..."
+        
+        required_sections=(
+          "Installation"
+          "Usage"
+          "Configuration"
+          "API"
+          "Contributing"
+          "License"
+        )
+        
+        missing_sections=()
+        for section in "${required_sections[@]}"; do
+          if ! grep -qi "## $section\|# $section" README.md; then
+            missing_sections+=("$section")
+          fi
+        done
+        
+        if [ ${#missing_sections[@]} -gt 0 ]; then
+          echo "Missing README sections: ${missing_sections[*]}"
+          echo "missing_readme_sections=true" >> $GITHUB_OUTPUT
+          echo "${missing_sections[*]}" > missing_readme_sections.txt
+        else
+          echo "README.md is complete!"
+          echo "missing_readme_sections=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Check Code Comments
+      id: comments_check
+      run: |
+        echo "Checking code comment density..."
+        
+        python -c "
+import ast
+import os
+
+def count_comments_and_lines(file_path):
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    
+    total_lines = len([line for line in lines if line.strip()])
+    comment_lines = len([line for line in lines if line.strip().startswith('#')])
+    
+    return total_lines, comment_lines
+
+total_code_lines = 0
+total_comment_lines = 0
+low_comment_files = []
+
+for root, dirs, files in os.walk('src'):
+    dirs[:] = [d for d in dirs if d != '__pycache__']
+    for file in files:
+        if file.endswith('.py') and not file.startswith('__'):
+            file_path = os.path.join(root, file)
+            code_lines, comment_lines = count_comments_and_lines(file_path)
+            
+            if code_lines > 20:  # Only check files with substantial code
+                comment_ratio = comment_lines / code_lines if code_lines > 0 else 0
+                
+                if comment_ratio < 0.1:  # Less than 10% comments
+                    low_comment_files.append(f'{file_path} ({comment_ratio:.1%})')
+                
+                total_code_lines += code_lines
+                total_comment_lines += comment_lines
+
+overall_ratio = total_comment_lines / total_code_lines if total_code_lines > 0 else 0
+
+print(f'Overall comment ratio: {overall_ratio:.1%}')
+print(f'Files with low comment density: {len(low_comment_files)}')
+
+if overall_ratio < 0.1 or len(low_comment_files) > 5:
+    print('needs_more_comments=true')
+    with open('low_comment_files.txt', 'w') as f:
+        f.write('\n'.join(low_comment_files))
+else:
+    print('needs_more_comments=false')
+" > comment_check.log 2>&1
+        
+        if grep -q "needs_more_comments=true" comment_check.log; then
+          echo "needs_comments=true" >> $GITHUB_OUTPUT
+        else
+          echo "needs_comments=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Documentation Issue
+      if: steps.doc_coverage.outputs.missing_docs == 'true' || steps.readme_check.outputs.missing_readme_sections == 'true' || steps.comments_check.outputs.needs_comments == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let issueBody = '# 📚 Documentation Improvement Needed\n\n';
+          issueBody += `**Analysis Date:** ${new Date().toISOString()}\n`;
+          issueBody += `**Triggered by:** ${context.eventName} on ${context.ref}\n\n`;
+          
+          // Missing docstrings
+          if ('${{ steps.doc_coverage.outputs.missing_docs }}' === 'true' && fs.existsSync('missing_docstrings.txt')) {
+            const missingDocs = fs.readFileSync('missing_docstrings.txt', 'utf8').trim().split('\n');
+            issueBody += '## 📝 Missing Docstrings\n\n';
+            issueBody += 'The following functions and classes are missing docstrings:\n\n';
+            
+            missingDocs.slice(0, 20).forEach(item => {
+              issueBody += `- \`${item}\`\n`;
+            });
+            
+            if (missingDocs.length > 20) {
+              issueBody += `\n... and ${missingDocs.length - 20} more\n`;
+            }
+            issueBody += '\n';
+          }
+          
+          // Missing README sections
+          if ('${{ steps.readme_check.outputs.missing_readme_sections }}' === 'true' && fs.existsSync('missing_readme_sections.txt')) {
+            const missingSections = fs.readFileSync('missing_readme_sections.txt', 'utf8').trim().split(' ');
+            issueBody += '## 📖 Missing README Sections\n\n';
+            issueBody += 'Please add the following sections to README.md:\n\n';
+            
+            missingSections.forEach(section => {
+              issueBody += `- ## ${section}\n`;
+            });
+            issueBody += '\n';
+          }
+          
+          // Low comment density
+          if ('${{ steps.comments_check.outputs.needs_comments }}' === 'true' && fs.existsSync('low_comment_files.txt')) {
+            const lowCommentFiles = fs.readFileSync('low_comment_files.txt', 'utf8').trim().split('\n');
+            issueBody += '## 💬 Files Need More Comments\n\n';
+            issueBody += 'The following files have low comment density:\n\n';
+            
+            lowCommentFiles.forEach(file => {
+              issueBody += `- \`${file}\`\n`;
+            });
+            issueBody += '\n';
+          }
+          
+          issueBody += '## ✅ Recommendations\n\n';
+          issueBody += '### For Docstrings:\n';
+          issueBody += '- Add docstrings to all public functions and classes\n';
+          issueBody += '- Use Google/NumPy docstring format\n';
+          issueBody += '- Include parameter types and return values\n\n';
+          
+          issueBody += '### For README:\n';
+          issueBody += '- Add missing sections with clear, helpful content\n';
+          issueBody += '- Include code examples where appropriate\n';
+          issueBody += '- Keep information up-to-date\n\n';
+          
+          issueBody += '### For Comments:\n';
+          issueBody += '- Add inline comments for complex logic\n';
+          issueBody += '- Explain why, not just what\n';
+          issueBody += '- Keep comments concise and relevant\n\n';
+          
+          issueBody += '---\n';
+          issueBody += '🤖 This issue was automatically created by documentation analysis.';
+          
+          // Check for existing documentation issues
+          const { data: existingIssues } = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'documentation',
+            state: 'open'
+          });
+          
+          const docIssues = existingIssues.filter(issue => 
+            issue.title.includes('Documentation Improvement') || issue.title.includes('📚')
+          );
+          
+          if (docIssues.length === 0) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '📚 Documentation Improvement Needed',
+              body: issueBody,
+              labels: ['documentation', 'enhancement', 'automated']
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: docIssues[0].number,
+              body: '🔄 **Updated Documentation Analysis**\n\n' + issueBody
+            });
+          }
+
+  auto-generate-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+        
+    - name: Generate API Documentation
+      run: |
+        echo "Generating API documentation..."
+        
+        # Create docs directory if it doesn't exist
+        mkdir -p docs/api
+        
+        # Generate module documentation
+        python -c "
+import os
+import importlib.util
+
+def generate_module_doc(module_path, module_name):
+    doc_content = f'''# {module_name.replace('_', ' ').title()} Module
+
+## Overview
+
+This module contains the implementation for {module_name.replace('_', ' ')}.
+
+## Classes and Functions
+
+'''
+    
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        # Get all classes and functions
+        import inspect
+        
+        members = inspect.getmembers(module)
+        
+        for name, obj in members:
+            if not name.startswith('_'):
+                if inspect.isclass(obj):
+                    doc_content += f'### {name} (Class)\n\n'
+                    if obj.__doc__:
+                        doc_content += f'{obj.__doc__}\n\n'
+                    else:
+                        doc_content += 'No documentation available.\n\n'
+                        
+                elif inspect.isfunction(obj):
+                    doc_content += f'### {name}() (Function)\n\n'
+                    if obj.__doc__:
+                        doc_content += f'{obj.__doc__}\n\n'
+                    else:
+                        doc_content += 'No documentation available.\n\n'
+        
+    except Exception as e:
+        doc_content += f'Error loading module: {e}\n'
+    
+    return doc_content
+
+# Generate docs for main modules
+modules = [
+    ('src/main.py', 'main'),
+    ('src/collectors/base_collector.py', 'base_collector'),
+    ('src/processors/translator.py', 'translator'),
+    ('src/notifiers/gmail_sender.py', 'gmail_sender'),
+]
+
+for module_path, module_name in modules:
+    if os.path.exists(module_path):
+        doc_content = generate_module_doc(module_path, module_name)
+        
+        with open(f'docs/api/{module_name}.md', 'w') as f:
+            f.write(doc_content)
+        
+        print(f'Generated docs/api/{module_name}.md')
+"
+        
+    - name: Update Architecture Diagram
+      run: |
+        echo "Updating architecture documentation..."
+        
+        cat > docs/ARCHITECTURE.md << 'EOF'
+# System Architecture
+
+## Overview
+
+The News Delivery System is designed as a modular, event-driven architecture that automatically collects, processes, and delivers news content.
+
+## Component Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    News Delivery System                      │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  Collectors │  │ Processors  │  │ Generators  │         │
+│  │             │  │             │  │             │         │
+│  │ • NewsAPI   │  │ • Translator│  │ • HTML Gen  │         │
+│  │ • GNews     │  │ • Analyzer  │  │ • PDF Gen   │         │
+│  │ • NVD       │  │ • Dedup     │  │             │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│          │                │                │               │
+│          └────────────────┼────────────────┘               │
+│                          │                                 │
+│  ┌─────────────┐        │        ┌─────────────┐         │
+│  │  Database   │◄───────┼───────►│ Notifiers   │         │
+│  │             │        │        │             │         │
+│  │ • SQLite    │        │        │ • Gmail     │         │
+│  │ • Cache     │        │        │ • SMTP      │         │
+│  └─────────────┘        │        └─────────────┘         │
+│                          │                                 │
+│  ┌─────────────┐        │        ┌─────────────┐         │
+│  │ Monitoring  │◄───────┼───────►│ Automation  │         │
+│  │             │        │        │             │         │
+│  │ • Logging   │        │        │ • Cron      │         │
+│  │ • Alerts    │        │        │ • Backup    │         │
+│  └─────────────┘        │        └─────────────┘         │
+│                          │                                 │
+│                    ┌─────▼─────┐                          │
+│                    │   Main    │                          │
+│                    │Controller │                          │
+│                    └───────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Data Flow
+
+1. **Collection Phase**: Multiple collectors gather news from various sources
+2. **Processing Phase**: Articles are translated, analyzed, and deduplicated
+3. **Generation Phase**: Reports are generated in HTML and PDF formats
+4. **Delivery Phase**: Reports are sent via email
+5. **Monitoring Phase**: System logs activities and sends alerts on errors
+
+## Security Considerations
+
+- API keys stored securely in environment variables
+- Email credentials managed through OAuth2
+- All HTTP connections use TLS
+- Input validation on all external data
+- Regular security scans via GitHub Actions
+
+## Scalability
+
+- Modular design allows easy addition of new collectors
+- Asynchronous processing for better performance
+- Database caching reduces API calls
+- Configurable retry mechanisms for reliability
+
+## Deployment
+
+- GitHub Actions for CI/CD
+- Automated testing and quality gates
+- Security scanning and dependency updates
+- Multiple deployment environments supported
+
+EOF
+        
+    - name: Commit Generated Documentation
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if [ -n "$(git status --porcelain)" ]; then
+          git add docs/
+          git commit -m "docs: Auto-generate API documentation and architecture
+
+- Generated API docs for core modules
+- Updated architecture diagram
+- Automated documentation maintenance
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>"
+          git push
+        else
+          echo "No documentation changes to commit"
+        fi
+
+  link-checker:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check Documentation Links
+      run: |
+        echo "Checking for broken links in documentation..."
+        
+        # Simple link checker for markdown files
+        find . -name "*.md" -not -path "./venv/*" -not -path "./.git/*" | while read file; do
+          echo "Checking links in $file"
+          
+          # Extract markdown links [text](url)
+          grep -oE '\[.*\]\([^)]+\)' "$file" | while read link; do
+            url=$(echo "$link" | sed 's/.*](//' | sed 's/).*//')
+            
+            # Skip anchor links and mailto links
+            if [[ "$url" =~ ^# ]] || [[ "$url" =~ ^mailto: ]]; then
+              continue
+            fi
+            
+            # Check if it's a relative file reference
+            if [[ ! "$url" =~ ^http ]]; then
+              if [[ ! -f "$url" ]] && [[ ! -d "$url" ]]; then
+                echo "❌ Broken relative link in $file: $url"
+              fi
+            fi
+          done
+        done
