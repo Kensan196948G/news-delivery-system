@@ -1,56 +1,51 @@
-name: Error to Issue Auto-Creation
+name: Error Detection and Issue Creation
 
 on:
   workflow_run:
-    workflows: ["*"]
-    types:
-      - completed
+    workflows: ["News Delivery System CI/CD"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
-  issues: write
   actions: read
+  issues: write
 
 jobs:
-  check-and-create-issue:
+  detect-and-report:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'failure'
-    
+    if: github.event.workflow_run.conclusion == 'failure' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 10
     steps:
-    - name: Check for existing issue
-      id: check_issue
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const { data: issues } = await github.rest.issues.listForRepo({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            labels: 'auto-generated,ci-failure',
-            state: 'open'
-          });
-          
-          const workflowName = '${{ github.event.workflow_run.name }}';
-          const existingIssue = issues.find(issue => 
-            issue.title.includes(workflowName)
-          );
-          
-          if (existingIssue) {
-            console.log('Existing issue found: #' + existingIssue.number + '');
-            return existingIssue.number;
-          }
-          return null;
-    
-    - name: Create issue for failure
-      if: steps.check_issue.outputs.result == 'null'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const workflowRun = context.payload.workflow_run;
-          
-          // Get workflow logs
-          let errorDetails = '';
-          try {
+      - uses: actions/checkout@v4
+      
+      - name: Check CI/CD failures
+        id: check_failures
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let workflowRun;
+            
+            if (context.eventName === 'workflow_dispatch') {
+              // For manual triggers, get the latest CI/CD run
+              const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci-cd.yml',
+                per_page: 1
+              });
+              workflowRun = runs.workflow_runs[0];
+            } else {
+              workflowRun = context.payload.workflow_run;
+            }
+            
+            if (!workflowRun || workflowRun.conclusion !== 'failure') {
+              console.log('No failures detected');
+              core.setOutput('has_failure', 'false');
+              return;
+            }
+            
+            // Get failed jobs
             const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -58,102 +53,154 @@ jobs:
             });
             
             const failedJobs = jobs.jobs.filter(job => job.conclusion === 'failure');
-            if (failedJobs.length > 0) {
-              errorDetails = failedJobs.map(job => {
-                const failedSteps = job.steps.filter(step => step.conclusion === 'failure');
-                return '### Job: ' + job.name + '\n' +
-                  failedSteps.map(step => '- Step failed: ' + step.name + '').join('\n');
-              }).join('\n\n');
+            
+            core.setOutput('has_failure', 'true');
+            core.setOutput('workflow_url', workflowRun.html_url);
+            core.setOutput('workflow_name', workflowRun.name);
+            core.setOutput('branch', workflowRun.head_branch);
+            core.setOutput('failed_jobs', JSON.stringify(failedJobs.map(j => ({
+              name: j.name,
+              url: j.html_url,
+              started_at: j.started_at,
+              completed_at: j.completed_at
+            }))));
+      
+      - name: Extract error details
+        id: extract_errors
+        if: steps.check_failures.outputs.has_failure == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failedJobs = JSON.parse('${{ steps.check_failures.outputs.failed_jobs }}');
+            const errors = [];
+            
+            for (const job of failedJobs) {
+              // Parse job name for error type
+              let errorType = 'Unknown';
+              if (job.name.includes('code-quality')) errorType = 'Code Quality';
+              else if (job.name.includes('unit-tests')) errorType = 'Unit Tests';
+              else if (job.name.includes('integration-tests')) errorType = 'Integration Tests';
+              else if (job.name.includes('security-scan')) errorType = 'Security Scan';
+              else if (job.name.includes('build')) errorType = 'Build';
+              
+              errors.push({
+                type: errorType,
+                job: job.name,
+                url: job.url
+              });
             }
-          } catch (e) {
-            console.log('Could not fetch job details:', e);
-          }
-          
-          const issueBody = '## 🚨 Automated Issue: CI/CD Failure Detected\n          \n          **Workflow:** ' + workflowRun.name + '\n          **Run ID:** ' + workflowRun.id + '\n          **Branch:** ' + workflowRun.head_branch + '\n          **Commit:** ' + workflowRun.head_sha + '\n          **Failure Time:** ' + new Date(workflowRun.updated_at).toISOString() + '\n          \n          ### 📋 Error Summary\n          ' + errorDetails || 'Error details could not be retrieved automatically.' + '\n          \n          ### 🔗 Links\n          - [Failed Workflow Run](' + workflowRun.html_url + ')\n          - [Commit](https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/commit/' + workflowRun.head_sha + ')\n          \n          ### 🤖 Auto-Repair Status\n          This issue was automatically created. The self-healing system will attempt to fix common issues.\n          \n          ### 📝 Suggested Actions\n          1. Review the workflow logs\n          2. Check for environment/dependency issues\n          3. Verify API keys and permissions\n          4. Run tests locally to reproduce\n          \n          ---\n          *This issue was automatically generated by the Error-to-Issue workflow*';
-          
-          const { data: issue } = await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: '🔴 CI Failure: ' + workflowRun.name + ' - ' + new Date().toISOString().split('T')[0] + '',
-            body: issueBody,
-            labels: ['auto-generated', 'ci-failure', 'bug', 'high-priority'],
-            assignees: []
-          });
-          
-          console.log('Created issue #' + issue.number + '');
-          return issue.number;
-    
-    - name: Trigger self-healing
-      if: steps.check_issue.outputs.result == 'null'
-      uses: actions/github-script@v7
-      continue-on-error: true
-      with:
-        script: |
-          // Trigger self-healing workflow
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'self-heal.yml',
-            ref: 'main',
-            inputs: {
-              issue_number: '${{ steps.create_issue.outputs.result }}',
-              error_type: 'ci_failure'
-            }
-          });
-          console.log('Self-healing workflow triggered');
-
-  auto-repair-common-issues:
-    runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'failure'
-    needs: check-and-create-issue
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Analyze and fix common issues
-      run: |
-        echo "Analyzing common CI/CD failures..."
-        
-        # Check for missing dependencies
-        if [ -f "requirements.txt" ]; then
-          echo "Checking Python dependencies..."
-          pip install --upgrade pip
-          pip install -r requirements.txt --no-cache-dir || true
-        fi
-        
-        # Check for permission issues
-        if [ -d ".github" ]; then
-          echo "Checking file permissions..."
-          find . -type f -name "*.sh" -exec chmod +x {} \;
-          find . -type f -name "*.py" -exec chmod +r {} \;
-        fi
-        
-        # Check environment variables
-        echo "Checking environment configuration..."
-        if [ ! -f ".env" ] && [ -f ".env.example" ]; then
-          cp .env.example .env
-          echo "Created .env from example"
-        fi
-    
-    - name: Comment on issue with findings
-      if: needs.check-and-create-issue.outputs.issue_number
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const issueNumber = ${{ needs.check-and-create-issue.outputs.issue_number }};
-          if (issueNumber) {
-            await github.rest.issues.createComment({
+            
+            core.setOutput('error_summary', JSON.stringify(errors));
+      
+      - name: Check for existing issue
+        id: check_issue
+        if: steps.check_failures.outputs.has_failure == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ steps.check_failures.outputs.branch }}';
+            
+            // Search for existing open issues for this branch
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: issueNumber,
-              body: `## 🔧 Auto-Repair Attempt
-              
-              The self-healing system has analyzed the failure and attempted the following fixes:
-              - ✅ Checked and updated dependencies
-              - ✅ Fixed file permissions
-              - ✅ Verified environment configuration
-              
-              Please re-run the workflow to see if the issue is resolved.`
+              state: 'open',
+              labels: 'ci-failure',
+              per_page: 100
             });
-          }
+            
+            const existingIssue = issues.find(issue => 
+              issue.title.includes(branch) && 
+              issue.title.includes('CI/CD Failure')
+            );
+            
+            core.setOutput('has_existing', existingIssue ? 'true' : 'false');
+            core.setOutput('existing_number', existingIssue ? existingIssue.number : '');
+      
+      - name: Create or update issue
+        if: steps.check_failures.outputs.has_failure == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const errors = JSON.parse('${{ steps.extract_errors.outputs.error_summary }}');
+            const branch = '${{ steps.check_failures.outputs.branch }}';
+            const workflowUrl = '${{ steps.check_failures.outputs.workflow_url }}';
+            const hasExisting = '${{ steps.check_issue.outputs.has_existing }}' === 'true';
+            const existingNumber = '${{ steps.check_issue.outputs.existing_number }}';
+            
+            const title = `🚨 CI/CD Failure on ${branch}`;
+            
+            const body = `## CI/CD Pipeline Failure Detected
+            
+            **Branch:** \`${branch}\`
+            **Workflow:** ${{ steps.check_failures.outputs.workflow_name }}
+            **Failed Run:** ${workflowUrl}
+            **Run ID:** ${context.runId}
+            **Run URL:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+            **Time:** ${new Date().toISOString()}
+            
+            ### Failed Jobs
+            ${errors.map(e => `- **${e.type}**: [${e.job}](${e.url})`).join('\n')}
+            
+            ### Error Summary
+            \`\`\`
+            ${errors.map(e => `${e.type}: Failed`).join('\n')}
+            \`\`\`
+            
+            ### Automated Actions
+            - [ ] Self-healing system triggered
+            - [ ] Retry attempted
+            - [ ] Manual review needed
+            
+            ### Next Steps
+            1. Review the failed workflow run
+            2. Check the self-healing system results
+            3. Apply manual fixes if needed
+            
+            ---
+            *This issue was automatically created by the error detection system.*`;
+            
+            if (hasExisting) {
+              // Update existing issue with a comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(existingNumber),
+                body: `## 🔄 New Failure Detected
+                
+                Another failure occurred on the same branch.
+                
+                **Latest Failed Run:** ${workflowUrl}
+                **Time:** ${new Date().toISOString()}
+                
+                ### Failed Jobs
+                ${errors.map(e => `- **${e.type}**: [${e.job}](${e.url})`).join('\n')}`
+              });
+              
+              console.log(`Updated existing issue #${existingNumber}`);
+            } else {
+              // Create new issue
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci-failure', 'automated', 'needs-attention']
+              });
+              
+              console.log(`Created issue #${issue.number}`);
+              
+              // Trigger self-healing workflow
+              await github.rest.repos.createDispatchEvent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                event_type: 'workflow-failure',
+                client_payload: {
+                  issue_number: issue.number,
+                  branch: branch,
+                  errors: errors
+                }
+              });
+              
+              console.log('Triggered self-healing workflow');
+            }

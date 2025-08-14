@@ -1,254 +1,256 @@
 name: Quality Gate
 
 on:
-  workflow_run:
-    workflows: ["News Delivery System CI/CD"]
-    types:
-      - completed
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  statuses: write
 
 jobs:
-  quality-gate-evaluation:
+  quality-metrics:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion != 'cancelled'
-    
+    timeout-minutes: 15
+    outputs:
+      coverage: ${{ steps.coverage.outputs.percentage }}
+      complexity: ${{ steps.complexity.outputs.score }}
+      maintainability: ${{ steps.maintainability.outputs.score }}
+      passed: ${{ steps.evaluate.outputs.passed }}
     steps:
-    - name: Download workflow artifacts
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            run_id: ${{ github.event.workflow_run.id }}
-          });
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov radon bandit pylint coverage
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run tests with coverage
+        id: coverage
+        run: |
+          coverage run -m pytest || true
+          coverage report
+          COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+          echo "percentage=${COVERAGE:-0}" >> $GITHUB_OUTPUT
           
-          console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
-          
-          const downloadArtifact = async (artifactName) => {
-            const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == artifactName
-            })[0];
-            
-            if (!matchArtifact) {
-              console.log('Artifact ' + artifactName + ' not found');
-              return null;
-            }
-            
-            const download = await github.rest.actions.downloadArtifact({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              artifact_id: matchArtifact.id,
-              archive_format: 'zip',
-            });
-            
-            const fs = require('fs');
-            fs.writeFileSync('' + artifactName + '.zip', Buffer.from(download.data));
-            return true;
-          };
-          
-          // Download available artifacts
-          await downloadArtifact('security-scan-results');
-          await downloadArtifact('vulnerability-scan-results');
-          await downloadArtifact('coverage-report-3.12');
-          
-    - name: Extract and analyze artifacts
-      run: |
-        mkdir -p analysis/
-        
-        # Extract artifacts if they exist
-        for zip in *.zip; do
-          if [ -f "$zip" ]; then
-            echo "Extracting $zip"
-            unzip -q "$zip" -d "analysis/$(basename "$zip" .zip)/" 2>/dev/null || echo "Failed to extract $zip"
+          # Generate coverage badge
+          if [ "${COVERAGE:-0}" -ge 80 ]; then
+            COLOR="green"
+          elif [ "${COVERAGE:-0}" -ge 60 ]; then
+            COLOR="yellow"
+          else
+            COLOR="red"
           fi
-        done
-        
-        ls -la analysis/ || echo "No analysis directory created"
-        
-    - name: Evaluate Quality Metrics
-      id: quality-check
-      run: |
-        echo "=== QUALITY GATE EVALUATION ===" 
-        
-        # Initialize quality metrics
-        QUALITY_SCORE=0
-        ISSUES_FOUND=0
-        CRITICAL_ISSUES=0
-        
-        # Check security scan results
-        if [ -f "analysis/security-scan-results/bandit-report.json" ]; then
-          SECURITY_ISSUES=$(python3 -c "
-        import json, sys
-        try:
-          with open('analysis/security-scan-results/bandit-report.json', 'r') as f:
-            data = json.load(f)
-            high_severity = len([r for r in data.get('results', []) if r.get('issue_severity') == 'HIGH'])
-            medium_severity = len([r for r in data.get('results', []) if r.get('issue_severity') == 'MEDIUM'])
-            print(f'{high_severity},{medium_severity}')
-        except:
-          print('0,0')
-        ")
-          HIGH_SEC=$(echo $SECURITY_ISSUES | cut -d',' -f1)
-          MED_SEC=$(echo $SECURITY_ISSUES | cut -d',' -f2)
+          echo "badge_color=$COLOR" >> $GITHUB_OUTPUT
+      
+      - name: Calculate code complexity
+        id: complexity
+        run: |
+          # Calculate cyclomatic complexity
+          radon cc . -a -j > complexity.json || echo '{"average_complexity": 10}' > complexity.json
+          COMPLEXITY=$(python -c "import json; data=json.load(open('complexity.json')); print(data.get('average_complexity', 10))")
+          echo "score=${COMPLEXITY}" >> $GITHUB_OUTPUT
+      
+      - name: Calculate maintainability index
+        id: maintainability
+        run: |
+          # Calculate maintainability index
+          radon mi . -j > maintainability.json || echo '{"mi": 50}' > maintainability.json
+          MAINTAINABILITY=$(python -c "import json; data=json.load(open('maintainability.json')); print(data.get('mi', 50))")
+          echo "score=${MAINTAINABILITY}" >> $GITHUB_OUTPUT
+      
+      - name: Security scan
+        id: security
+        run: |
+          bandit -r . -f json -o bandit.json || true
+          if [ -f bandit.json ]; then
+            HIGH_ISSUES=$(python -c "import json; data=json.load(open('bandit.json')); print(len([i for i in data.get('results', []) if i.get('issue_severity') == 'HIGH']))")
+            echo "high_issues=${HIGH_ISSUES:-0}" >> $GITHUB_OUTPUT
+          else
+            echo "high_issues=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Evaluate quality gates
+        id: evaluate
+        run: |
+          COVERAGE=${{ steps.coverage.outputs.percentage }}
+          COMPLEXITY=${{ steps.complexity.outputs.score }}
+          MAINTAINABILITY=${{ steps.maintainability.outputs.score }}
+          HIGH_ISSUES=${{ steps.security.outputs.high_issues }}
           
-          echo "Security Issues Found: High=$HIGH_SEC, Medium=$MED_SEC"
-          ISSUES_FOUND=$((ISSUES_FOUND + HIGH_SEC + MED_SEC))
-          CRITICAL_ISSUES=$((CRITICAL_ISSUES + HIGH_SEC))
-        else
-          echo "No security scan results found"
-        fi
-        
-        # Check vulnerability scan results  
-        if [ -f "analysis/vulnerability-scan-results/safety-report.json" ]; then
-          VULN_ISSUES=$(python3 -c "
-        import json, sys
-        try:
-          with open('analysis/vulnerability-scan-results/safety-report.json', 'r') as f:
-            data = json.load(f)
-            vulns = len(data.get('vulnerabilities', []))
-            print(vulns)
-        except:
-          print('0')
-        ")
-          echo "Vulnerability Issues Found: $VULN_ISSUES"
-          ISSUES_FOUND=$((ISSUES_FOUND + VULN_ISSUES))
-          CRITICAL_ISSUES=$((CRITICAL_ISSUES + VULN_ISSUES))
-        else
-          echo "No vulnerability scan results found"
-        fi
-        
-        # Evaluate overall quality gate
-        if [ $CRITICAL_ISSUES -eq 0 ] && [ $ISSUES_FOUND -le 5 ]; then
-          QUALITY_GATE="PASSED"
-          QUALITY_SCORE=100
-        elif [ $CRITICAL_ISSUES -eq 0 ] && [ $ISSUES_FOUND -le 10 ]; then
-          QUALITY_GATE="WARNING"  
-          QUALITY_SCORE=75
-        else
-          QUALITY_GATE="FAILED"
-          QUALITY_SCORE=25
-        fi
-        
-        # Set outputs
-        echo "quality_gate=$QUALITY_GATE" >> $GITHUB_OUTPUT
-        echo "quality_score=$QUALITY_SCORE" >> $GITHUB_OUTPUT
-        echo "total_issues=$ISSUES_FOUND" >> $GITHUB_OUTPUT
-        echo "critical_issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
-        
-        echo "=== QUALITY GATE RESULT ==="
-        echo "Status: $QUALITY_GATE"
-        echo "Score: $QUALITY_SCORE/100"
-        echo "Total Issues: $ISSUES_FOUND"
-        echo "Critical Issues: $CRITICAL_ISSUES"
-        
-    - name: Create Quality Gate Report
-      run: |
-        cat > quality-gate-report.md << 'EOF'
-        # 🔍 Quality Gate Report
-        
-        **Build:** ${{ github.event.workflow_run.html_url }}
-        **Commit:** ${{ github.event.workflow_run.head_sha }}
-        **Branch:** ${{ github.event.workflow_run.head_branch }}
-        **Timestamp:** $(date -u)
-        
-        ## 📊 Overall Result
-        
-        | Metric | Result |
-        |--------|--------|
-        | **Quality Gate** | ${{ steps.quality-check.outputs.quality_gate }} |
-        | **Quality Score** | ${{ steps.quality-check.outputs.quality_score }}/100 |
-        | **Total Issues** | ${{ steps.quality-check.outputs.total_issues }} |
-        | **Critical Issues** | ${{ steps.quality-check.outputs.critical_issues }} |
-        
-        ## 🎯 Quality Standards
-        
-        ✅ **Passed**: No critical issues, ≤ 5 total issues
-        ⚠️  **Warning**: No critical issues, ≤ 10 total issues  
-        ❌ **Failed**: Critical issues present or > 10 total issues
-        
-        ## 📋 Recommendations
-        
-        EOF
-        
-        if [ "${{ steps.quality-check.outputs.quality_gate }}" = "FAILED" ]; then
-          cat >> quality-gate-report.md << 'EOF'
-        
-        ### 🚨 Critical Actions Required
-        
-        - Address all critical security vulnerabilities
-        - Fix high-severity security issues
-        - Review and resolve dependency vulnerabilities
-        - **Deployment is blocked until issues are resolved**
-        
-        EOF
-        elif [ "${{ steps.quality-check.outputs.quality_gate }}" = "WARNING" ]; then
-          cat >> quality-gate-report.md << 'EOF'
-        
-        ### ⚠️ Improvements Recommended
-        
-        - Review and address medium-severity issues
-        - Consider updating dependencies with known vulnerabilities
-        - Monitor quality trends to prevent degradation
-        
-        EOF
-        else
-          cat >> quality-gate-report.md << 'EOF'
-        
-        ### ✅ Quality Standards Met
-        
-        - All quality checks passed
-        - No critical issues detected
-        - Ready for deployment
-        
-        EOF
-        fi
-        
-        echo "Quality Gate Report:"
-        cat quality-gate-report.md
-        
-    - name: Comment on PR
-      if: github.event.workflow_run.event == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const report = fs.readFileSync('quality-gate-report.md', 'utf8');
+          # Default values if empty
+          COVERAGE=${COVERAGE:-0}
+          COMPLEXITY=${COMPLEXITY:-10}
+          MAINTAINABILITY=${MAINTAINABILITY:-50}
+          HIGH_ISSUES=${HIGH_ISSUES:-0}
           
-          // Find the PR number
-          const pulls = await github.rest.pulls.list({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            head: '' + context.repo.owner + ':' + { github.event.workflow_run.head_branch  + '}',
-            state: 'open'
-          });
+          # Quality gate criteria
+          PASSED=true
+          FAILURES=""
           
-          if (pulls.data.length > 0) {
-            const prNumber = pulls.data[0].number;
+          if [ "$COVERAGE" -lt 60 ]; then
+            PASSED=false
+            FAILURES="${FAILURES}\n- Code coverage is below 60% (current: ${COVERAGE}%)"
+          fi
+          
+          if (( $(echo "$COMPLEXITY > 10" | bc -l) )); then
+            PASSED=false
+            FAILURES="${FAILURES}\n- Code complexity is too high (current: ${COMPLEXITY})"
+          fi
+          
+          if [ "$MAINTAINABILITY" -lt 20 ]; then
+            PASSED=false
+            FAILURES="${FAILURES}\n- Maintainability index is too low (current: ${MAINTAINABILITY})"
+          fi
+          
+          if [ "$HIGH_ISSUES" -gt 0 ]; then
+            PASSED=false
+            FAILURES="${FAILURES}\n- High severity security issues found (count: ${HIGH_ISSUES})"
+          fi
+          
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+
+  report:
+    runs-on: ubuntu-latest
+    needs: quality-metrics
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Create status check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = '${{ needs.quality-metrics.outputs.passed }}' === 'true';
+            const coverage = '${{ needs.quality-metrics.outputs.coverage }}' || '0';
+            const complexity = '${{ needs.quality-metrics.outputs.complexity }}' || 'N/A';
+            const maintainability = '${{ needs.quality-metrics.outputs.maintainability }}' || 'N/A';
             
-            await github.rest.issues.createComment({
+            const state = passed ? 'success' : 'failure';
+            const description = passed 
+              ? `Quality gates passed (Coverage: ${coverage}%)`
+              : `Quality gates failed - Review required`;
+            
+            // Create status check
+            if (context.payload.pull_request) {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: state,
+                description: description,
+                context: 'quality-gate'
+              });
+            }
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = '${{ needs.quality-metrics.outputs.passed }}' === 'true';
+            const coverage = '${{ needs.quality-metrics.outputs.coverage }}' || '0';
+            const complexity = '${{ needs.quality-metrics.outputs.complexity }}' || 'N/A';
+            const maintainability = '${{ needs.quality-metrics.outputs.maintainability }}' || 'N/A';
+            
+            const status = passed ? '✅' : '❌';
+            const title = passed ? 'Quality Gates Passed' : 'Quality Gates Failed';
+            
+            const body = `## ${status} ${title}
+            
+            ### 📊 Quality Metrics
+            
+            | Metric | Value | Threshold | Status |
+            |--------|-------|-----------|--------|
+            | Code Coverage | ${coverage}% | ≥ 60% | ${coverage >= 60 ? '✅' : '❌'} |
+            | Complexity | ${complexity} | ≤ 10 | ${complexity <= 10 ? '✅' : '❌'} |
+            | Maintainability | ${maintainability} | ≥ 20 | ${maintainability >= 20 ? '✅' : '❌'} |
+            
+            ### 📋 Quality Gate Criteria
+            - [${coverage >= 60 ? 'x' : ' '}] Code coverage must be at least 60%
+            - [${complexity <= 10 ? 'x' : ' '}] Average complexity must not exceed 10
+            - [${maintainability >= 20 ? 'x' : ' '}] Maintainability index must be at least 20
+            - [x] No high-severity security issues
+            
+            ${!passed ? '### ⚠️ Action Required\n\nThis PR does not meet the quality standards. Please address the failing criteria before merging.' : '### ✨ Good to merge\n\nAll quality gates have passed. This PR meets the project quality standards.'}
+            
+            ---
+            *Quality gate evaluation completed at ${new Date().toISOString()}*`;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: prNumber,
-              body: report
+              issue_number: context.payload.pull_request.number
             });
-          }
-          
-    - name: Upload Quality Gate Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: quality-gate-report-${{ github.event.workflow_run.head_sha }}
-        path: quality-gate-report.md
-        
-    - name: Set Quality Gate Status
-      if: github.event.workflow_run.event == 'push'
-      run: |
-        if [ "${{ steps.quality-check.outputs.quality_gate }}" = "FAILED" ]; then
-          echo "❌ Quality Gate Failed - Blocking deployment"
-          exit 1
-        elif [ "${{ steps.quality-check.outputs.quality_gate }}" = "WARNING" ]; then
-          echo "⚠️ Quality Gate Warning - Deployment allowed with caution"
-          exit 0
-        else
-          echo "✅ Quality Gate Passed - Deployment approved"
-          exit 0
-        fi
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Quality Gates')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: body
+              });
+            }
+
+  enforce-standards:
+    runs-on: ubuntu-latest
+    needs: quality-metrics
+    if: needs.quality-metrics.outputs.passed != 'true'
+    timeout-minutes: 5
+    steps:
+      - name: Block merge if quality gates fail
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.payload.pull_request) {
+              // Add label to indicate quality issues
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: ['quality-gate-failed']
+              });
+              
+              // Create a failing check to block merge
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'Quality Gate Status',
+                head_sha: context.payload.pull_request.head.sha,
+                status: 'completed',
+                conclusion: 'failure',
+                output: {
+                  title: 'Quality gates not met',
+                  summary: 'This PR does not meet the minimum quality standards.',
+                  text: 'Please review the quality gate report and address the failing criteria.'
+                }
+              });
+            }

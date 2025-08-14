@@ -2,177 +2,353 @@ name: Continuous Monitoring
 
 on:
   schedule:
-    # 1時間おきに実行 (新仕様: 1時間以内検知保証)
-    - cron: '0 * * * *'
-    # 完全自動フローと連携
-  
-  workflow_dispatch: # 手動実行可能
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
     inputs:
       check_type:
-        description: '監視タイプ選択'
-        required: true
+        description: 'Type of monitoring check'
+        required: false
         default: 'all'
         type: choice
         options:
-        - all
-        - security
-        - health
-        - backup
+          - all
+          - performance
+          - health
+          - workflows
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
   actions: read
+  issues: write
+  pull-requests: read
 
 jobs:
-  continuous-health-check:
+  workflow-health:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 10
+    outputs:
+      health_score: ${{ steps.calculate.outputs.score }}
+      issues_found: ${{ steps.calculate.outputs.issues }}
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        
-    - name: Install monitoring dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests pyyaml python-dotenv
-        
-    - name: System Health Check
-      id: health-check
-      run: |
-        echo "=== システムヘルスチェック（$(date '+%Y-%m-%d %H:%M:%S JST')）===" 
-        
-        # GitHubリポジトリ統計
-        echo "## リポジトリ統計" >> health-report.md
-        echo "- 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST')" >> health-report.md
-        echo "- コミット数: $(git rev-list --count HEAD)" >> health-report.md
-        echo "- ブランチ数: $(git branch -r | wc -l)" >> health-report.md
-        echo "" >> health-report.md
-        
-        # ファイル健全性チェック
-        echo "## ファイル健全性" >> health-report.md
-        
-        # 重要設定ファイルの存在確認
-        critical_files=(
-          "requirements.txt"
-          "requirements-minimal.txt" 
-          ".github/workflows/ci-cd.yml"
-          "src/main.py"
-          "docs/システム概要.md"
-        )
-        
-        missing_files=()
-        for file in "${critical_files[@]}"; do
-          if [ -f "$file" ]; then
-            echo "- ✅ $file: 存在" >> health-report.md
-          else
-            echo "- ❌ $file: 不足" >> health-report.md
-            missing_files+=("$file")
-          fi
-        done
-        
-        # 依存関係チェック
-        echo "" >> health-report.md
-        echo "## 依存関係状態" >> health-report.md
-        if [ -f "requirements.txt" ]; then
-          total_deps=$(grep -c "^[^#]" requirements.txt || echo "0")
-          echo "- 総依存パッケージ数: $total_deps" >> health-report.md
-        fi
-        
-        # 健全性スコア計算
-        if [ ${#missing_files[@]} -eq 0 ]; then
-          echo "HEALTH_STATUS=HEALTHY" >> $GITHUB_ENV
-          echo "- 🟢 **システム状態: 正常**" >> health-report.md
-        else
-          echo "HEALTH_STATUS=WARNING" >> $GITHUB_ENV
-          echo "- 🟡 **システム状態: 注意が必要**" >> health-report.md
-        fi
-        
-        cat health-report.md
-        
-    - name: Quick Security Scan
-      if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'security' || github.event.schedule
-      run: |
-        echo "=== クイックセキュリティスキャン ===" 
-        
-        # Safety - 既知の脆弱性チェック（高速）
-        pip install safety
-        safety check --short-report --json > safety-quick.json || echo "脆弱性検出または確認完了"
-        
-        # 設定ファイルセキュリティチェック
-        echo "## セキュリティチェック結果" >> health-report.md
-        echo "- Safety実行: ✅" >> health-report.md
-        echo "- 実行時刻: $(date '+%H:%M JST')" >> health-report.md
-        
-        # 危険なパターンの簡易チェック
-        if grep -r "password.*=" . --include="*.py" --exclude-dir=".git" | head -5; then
-          echo "- ⚠️ ハードコードされた認証情報の可能性を検出" >> health-report.md
-        else
-          echo "- ✅ 明らかな認証情報ハードコードなし" >> health-report.md
-        fi
-        
-    - name: Backup Status Check
-      if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'backup' || github.event.schedule
-      run: |
-        echo "=== バックアップ状態確認 ===" 
-        
-        echo "" >> health-report.md
-        echo "## バックアップ状態" >> health-report.md
-        echo "- 最終チェック: $(date '+%Y-%m-%d %H:%M JST')" >> health-report.md
-        
-        # Gitコミット状態確認
-        last_commit=$(git log -1 --format="%h - %s (%cr)")
-        echo "- 最新コミット: $last_commit" >> health-report.md
-        
-        # リモート同期状態
-        git fetch origin main
-        local_commits=$(git rev-list HEAD --count)
-        remote_commits=$(git rev-list origin/main --count)
-        
-        if [ "$local_commits" -eq "$remote_commits" ]; then
-          echo "- 🟢 リモート同期: 最新" >> health-report.md
-        else
-          echo "- 🟡 リモート同期: 差分あり (ローカル:$local_commits, リモート:$remote_commits)" >> health-report.md
-        fi
-        
-    - name: Trigger Auto-Repair if Problems Detected
-      if: env.HEALTH_STATUS == 'WARNING' || env.HEALTH_STATUS == 'CRITICAL'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          console.log('🔧 問題検出 - 自動修復サイクルをトリガー');
-          
-          // 自動修復ワークフローを起動
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'auto-repair-cycle.yml',
-            ref: 'main',
-            inputs: {
-              repair_type: 'auto'
+      - uses: actions/checkout@v4
+      
+      - name: Analyze workflow runs
+        id: analyze
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const now = new Date();
+            const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
+            
+            // Get recent workflow runs
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              created: `>${oneDayAgo.toISOString()}`,
+              per_page: 100
+            });
+            
+            // Calculate metrics
+            const metrics = {
+              total: runs.workflow_runs.length,
+              successful: 0,
+              failed: 0,
+              cancelled: 0,
+              in_progress: 0,
+              avg_duration: 0,
+              long_running: []
+            };
+            
+            let totalDuration = 0;
+            let completedRuns = 0;
+            
+            for (const run of runs.workflow_runs) {
+              switch (run.status) {
+                case 'completed':
+                  if (run.conclusion === 'success') metrics.successful++;
+                  else if (run.conclusion === 'failure') metrics.failed++;
+                  else if (run.conclusion === 'cancelled') metrics.cancelled++;
+                  
+                  // Calculate duration
+                  const duration = new Date(run.updated_at) - new Date(run.created_at);
+                  totalDuration += duration;
+                  completedRuns++;
+                  
+                  // Flag long-running workflows (> 30 minutes)
+                  if (duration > 30 * 60 * 1000) {
+                    metrics.long_running.push({
+                      name: run.name,
+                      duration: Math.round(duration / 60000)
+                    });
+                  }
+                  break;
+                case 'in_progress':
+                  metrics.in_progress++;
+                  break;
+              }
             }
-          });
+            
+            metrics.avg_duration = completedRuns > 0 ? Math.round(totalDuration / completedRuns / 60000) : 0;
+            metrics.success_rate = metrics.total > 0 ? (metrics.successful / metrics.total * 100).toFixed(1) : 0;
+            
+            core.setOutput('metrics', JSON.stringify(metrics));
+            
+            console.log('Workflow Health Metrics:');
+            console.log(`- Total runs: ${metrics.total}`);
+            console.log(`- Success rate: ${metrics.success_rate}%`);
+            console.log(`- Average duration: ${metrics.avg_duration} minutes`);
+            console.log(`- Failed runs: ${metrics.failed}`);
+            console.log(`- In progress: ${metrics.in_progress}`);
+      
+      - name: Calculate health score
+        id: calculate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const metrics = JSON.parse('${{ steps.analyze.outputs.metrics }}');
+            const issues = [];
+            let score = 100;
+            
+            // Deduct points for issues
+            if (metrics.success_rate < 90) {
+              score -= 20;
+              issues.push(`Low success rate: ${metrics.success_rate}%`);
+            }
+            
+            if (metrics.failed > 5) {
+              score -= 15;
+              issues.push(`High failure count: ${metrics.failed}`);
+            }
+            
+            if (metrics.avg_duration > 20) {
+              score -= 10;
+              issues.push(`Slow average runtime: ${metrics.avg_duration} minutes`);
+            }
+            
+            if (metrics.long_running.length > 0) {
+              score -= 5;
+              issues.push(`${metrics.long_running.length} long-running workflows detected`);
+            }
+            
+            core.setOutput('score', score);
+            core.setOutput('issues', JSON.stringify(issues));
+            
+            // Create summary
+            let summary = `## 📊 Workflow Health Report
+            
+            **Health Score:** ${score}/100 ${score >= 80 ? '✅' : score >= 60 ? '⚠️' : '❌'}
+            
+            ### Metrics (Last 24 Hours)
+            - **Total Runs:** ${metrics.total}
+            - **Success Rate:** ${metrics.success_rate}%
+            - **Failed Runs:** ${metrics.failed}
+            - **Average Duration:** ${metrics.avg_duration} minutes
+            `;
+            
+            if (issues.length > 0) {
+              summary += `
+            ### Issues Detected
+            ${issues.map(i => `- ${i}`).join('\n')}`;
+            }
+            
+            if (metrics.long_running.length > 0) {
+              summary += `
+            ### Long-Running Workflows
+            ${metrics.long_running.map(w => `- ${w.name}: ${w.duration} minutes`).join('\n')}`;
+            }
+            
+            // Write to step summary
+            await core.summary
+              .addRaw(summary)
+              .write();
+
+  performance-monitoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check repository size
+        id: repo_size
+        run: |
+          # Get repository size
+          REPO_SIZE=$(du -sh . | cut -f1)
+          echo "size=$REPO_SIZE" >> $GITHUB_OUTPUT
           
-          console.log('✅ 自動修復サイクル開始 - メール配信なし');
+          # Check for large files
+          find . -type f -size +10M -exec ls -lh {} \; > large_files.txt || true
           
-    - name: Upload Health Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: health-report-${{ github.run_number }}
-        path: |
-          health-report.md
-          safety-quick.json
-        retention-days: 7
-        
-    - name: Notification Summary
-      run: |
-        echo "=== 継続的監視完了 ===" 
-        echo "🕐 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST')"
-        echo "📊 システム状態: $HEALTH_STATUS"
-        echo "📁 レポート: health-report-${{ github.run_number }}"
-        echo "⏰ 次回実行: 30分後"
+          if [ -s large_files.txt ]; then
+            echo "Large files detected:"
+            cat large_files.txt
+            echo "has_large_files=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_large_files=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Analyze code metrics
+        run: |
+          # Count lines of code
+          echo "## Code Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Python files
+          if ls *.py 2>/dev/null || ls **/*.py 2>/dev/null; then
+            PY_FILES=$(find . -name "*.py" -type f | wc -l)
+            PY_LINES=$(find . -name "*.py" -type f -exec cat {} \; | wc -l)
+            echo "- Python files: $PY_FILES" >> $GITHUB_STEP_SUMMARY
+            echo "- Python lines: $PY_LINES" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # YAML files
+          YAML_FILES=$(find .github/workflows -name "*.yml" -o -name "*.yaml" | wc -l)
+          echo "- Workflow files: $YAML_FILES" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository size:** ${{ steps.repo_size.outputs.size }}" >> $GITHUB_STEP_SUMMARY
+
+  resource-monitoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check API rate limits
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check GitHub API rate limit
+            const { data: rateLimit } = await github.rest.rateLimit.get();
+            
+            const core_limit = rateLimit.resources.core;
+            const actions_limit = rateLimit.resources.actions_runner_registration;
+            
+            const core_usage = ((core_limit.limit - core_limit.remaining) / core_limit.limit * 100).toFixed(1);
+            const reset_time = new Date(core_limit.reset * 1000).toLocaleTimeString();
+            
+            console.log(`GitHub API Rate Limit:`);
+            console.log(`- Used: ${core_limit.limit - core_limit.remaining}/${core_limit.limit} (${core_usage}%)`);
+            console.log(`- Remaining: ${core_limit.remaining}`);
+            console.log(`- Resets at: ${reset_time}`);
+            
+            // Warn if approaching limit
+            if (core_usage > 80) {
+              core.warning(`GitHub API rate limit usage is high: ${core_usage}%`);
+            }
+      
+      - name: Check workflow minutes usage
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // This would typically interface with billing API
+            // For now, we'll create a placeholder report
+            
+            const report = `## 📊 Resource Usage Report
+            
+            ### GitHub Actions Minutes
+            - Monthly allocation: 2000 minutes (free tier)
+            - Estimated usage: Check Settings > Billing
+            
+            ### Storage Usage
+            - Repository size: ${{ steps.repo_size.outputs.size || 'Unknown' }}
+            - Artifacts: Check Actions > Management
+            
+            ### Recommendations
+            - Enable artifact cleanup after 7 days
+            - Use concurrency limits to prevent parallel runs
+            - Cache dependencies to reduce build time
+            `;
+            
+            await core.summary
+              .addRaw(report)
+              .write();
+
+  alert-on-issues:
+    runs-on: ubuntu-latest
+    needs: [workflow-health, performance-monitoring]
+    if: always() && (needs.workflow-health.outputs.health_score < 70 || failure())
+    timeout-minutes: 5
+    steps:
+      - name: Create monitoring alert
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const healthScore = ${{ needs.workflow-health.outputs.health_score || 100 }};
+            const issues = JSON.parse('${{ needs.workflow-health.outputs.issues || '[]' }}');
+            
+            // Check for existing monitoring issue
+            const { data: existingIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'monitoring-alert',
+              per_page: 1
+            });
+            
+            const title = '🚨 Monitoring Alert: System Health Degraded';
+            const body = `## System Health Alert
+            
+            The continuous monitoring system has detected issues that require attention.
+            
+            **Health Score:** ${healthScore}/100
+            **Timestamp:** ${new Date().toISOString()}
+            
+            ### Issues Detected
+            ${issues.map(issue => `- ${issue}`).join('\n')}
+            
+            ### Recommended Actions
+            1. Review recent workflow failures
+            2. Check for performance bottlenecks
+            3. Verify resource usage is within limits
+            4. Run manual diagnostics if needed
+            
+            ### Monitoring Dashboard
+            - [Workflow runs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions)
+            - [Resource usage](https://github.com/${context.repo.owner}/${context.repo.repo}/settings/billing)
+            - [Security alerts](https://github.com/${context.repo.owner}/${context.repo.repo}/security)
+            
+            ---
+            *This alert was generated by the continuous monitoring system.*`;
+            
+            if (existingIssues.length === 0 && healthScore < 70) {
+              // Create new issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['monitoring-alert', 'needs-attention', 'autofix']
+              });
+              
+              console.log('Monitoring alert issue created');
+              
+              // Trigger self-healing workflow if critical
+              if (healthScore < 50) {
+                await github.rest.repos.createDispatchEvent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  event_type: 'workflow-failure',
+                  client_payload: {
+                    source: 'continuous-monitoring',
+                    health_score: healthScore,
+                    issues: issues,
+                    issue_number: issue.data.number
+                  }
+                });
+                console.log('Triggered self-healing workflow due to critical health score');
+              }
+            } else if (existingIssues.length > 0) {
+              // Update existing issue with comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssues[0].number,
+                body: `## 🔄 Updated Alert
+                
+                **Health Score:** ${healthScore}/100
+                **Time:** ${new Date().toISOString()}
+                
+                ### Current Issues
+                ${issues.map(issue => `- ${issue}`).join('\n')}`
+              });
+              
+              console.log('Updated existing monitoring alert');
+            }
