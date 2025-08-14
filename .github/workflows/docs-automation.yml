@@ -344,21 +344,21 @@ This module contains the implementation for {module_name.replace('_', ' ')}.
         for name, obj in members:
             if not name.startswith('_'):
                 if inspect.isclass(obj):
-                    doc_content += f'### {name} (Class)\n\n'
+                    doc_content += f'### {name} (Class)\\n\\n'
                     if obj.__doc__:
-                        doc_content += f'{obj.__doc__}\n\n'
+                        doc_content += f'{obj.__doc__}\\n\\n'
                     else:
-                        doc_content += 'No documentation available.\n\n'
+                        doc_content += 'No documentation available.\\n\\n'
                         
                 elif inspect.isfunction(obj):
-                    doc_content += f'### {name}() (Function)\n\n'
+                    doc_content += f'### {name}() (Function)\\n\\n'
                     if obj.__doc__:
-                        doc_content += f'{obj.__doc__}\n\n'
+                        doc_content += f'{obj.__doc__}\\n\\n'
                     else:
-                        doc_content += 'No documentation available.\n\n'
+                        doc_content += 'No documentation available.\\n\\n'
         
     except Exception as e:
-        doc_content += f'Error loading module: {e}\n'
+        doc_content += f'Error loading module: {e}\\n'
     
     return doc_content
 
