@@ -11,45 +11,64 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion != 'cancelled'
     
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+      issues: write
+    
     steps:
     - name: Download workflow artifacts
       uses: actions/github-script@v7
+      continue-on-error: true
       with:
         script: |
-          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            run_id: ${{ github.event.workflow_run.id }}
-          });
-          
-          console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
-          
-          const downloadArtifact = async (artifactName) => {
-            const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == artifactName
-            })[0];
-            
-            if (!matchArtifact) {
-              console.log(`Artifact ${artifactName} not found`);
-              return null;
-            }
-            
-            const download = await github.rest.actions.downloadArtifact({
+          try {
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              artifact_id: matchArtifact.id,
-              archive_format: 'zip',
+              run_id: ${{ github.event.workflow_run.id }}
             });
             
-            const fs = require('fs');
-            fs.writeFileSync(`${artifactName}.zip`, Buffer.from(download.data));
-            return true;
-          };
-          
-          // Download available artifacts
-          await downloadArtifact('security-scan-results');
-          await downloadArtifact('vulnerability-scan-results');
-          await downloadArtifact('coverage-report-3.12');
+            console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
+            
+            const downloadArtifact = async (artifactName) => {
+              try {
+                const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
+                  return artifact.name == artifactName
+                })[0];
+                
+                if (!matchArtifact) {
+                  console.log(`Artifact ${artifactName} not found`);
+                  return null;
+                }
+                
+                const download = await github.rest.actions.downloadArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: matchArtifact.id,
+                  archive_format: 'zip',
+                });
+                
+                const fs = require('fs');
+                fs.writeFileSync(`${artifactName}.zip`, Buffer.from(download.data));
+                console.log(`Successfully downloaded ${artifactName}.zip`);
+                return true;
+              } catch (error) {
+                console.log(`Failed to download ${artifactName}: ${error.message}`);
+                return false;
+              }
+            };
+            
+            // Attempt to download available artifacts
+            await downloadArtifact('security-scan-results');
+            await downloadArtifact('vulnerability-scan-results');
+            await downloadArtifact('coverage-report-3.12');
+            
+          } catch (error) {
+            console.log(`Artifact access failed: ${error.message}`);
+            console.log('Continuing without artifact analysis...');
+          }
           
     - name: Extract and analyze artifacts
       run: |
