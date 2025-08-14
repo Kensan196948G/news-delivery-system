@@ -49,48 +49,48 @@ jobs:
       run: |
         echo "Checking documentation coverage..."
         
-        # Check for missing docstrings
-        python3 > doc_check.log 2>&1 << 'DOCSTRING_CHECK_PY'
-import ast
-import os
-import sys
-
-def check_docstrings(file_path):
-    with open(file_path, 'r') as f:
-        tree = ast.parse(f.read())
-    
-    missing_docs = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-            if not ast.get_docstring(node):
-                missing_docs.append(f'{file_path}:{node.lineno} - {node.name}')
-    return missing_docs
-
-all_missing = []
-for root, dirs, files in os.walk('src'):
-    dirs[:] = [d for d in dirs if d != '__pycache__']
-    for file in files:
-        if file.endswith('.py') and not file.startswith('__'):
-            file_path = os.path.join(root, file)
-            try:
-                missing = check_docstrings(file_path)
-                all_missing.extend(missing)
-            except:
-                pass
-
-if all_missing:
-    print(f'Found {len(all_missing)} missing docstrings:')
-    for item in all_missing[:20]:  # Show first 20
-        print(f'  {item}')
-    
-    with open('missing_docstrings.txt', 'w') as f:
-        f.write('\n'.join(all_missing))
-    
-    print('missing_docstrings=true')
-else:
-    print('All functions and classes have docstrings!')
-    print('missing_docstrings=false')
-DOCSTRING_CHECK_PY
+        # Create and run Python script inline
+        python3 -c "
+        import ast
+        import os
+        import sys
+        
+        def check_docstrings(file_path):
+            with open(file_path, 'r') as f:
+                tree = ast.parse(f.read())
+            
+            missing_docs = []
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                    if not ast.get_docstring(node):
+                        missing_docs.append(f'{file_path}:{node.lineno} - {node.name}')
+            return missing_docs
+        
+        all_missing = []
+        for root, dirs, files in os.walk('src'):
+            dirs[:] = [d for d in dirs if d != '__pycache__']
+            for file in files:
+                if file.endswith('.py') and not file.startswith('__'):
+                    file_path = os.path.join(root, file)
+                    try:
+                        missing = check_docstrings(file_path)
+                        all_missing.extend(missing)
+                    except:
+                        pass
+        
+        if all_missing:
+            print(f'Found {len(all_missing)} missing docstrings:')
+            for item in all_missing[:20]:  # Show first 20
+                print(f'  {item}')
+            
+            with open('missing_docstrings.txt', 'w') as f:
+                f.write('\\n'.join(all_missing))
+            
+            print('missing_docstrings=true')
+        else:
+            print('All functions and classes have docstrings!')
+            print('missing_docstrings=false')
+        " > doc_check.log 2>&1
         
         if grep -q "missing_docstrings=true" doc_check.log; then
           echo "missing_docs=true" >> $GITHUB_OUTPUT
@@ -133,53 +133,51 @@ DOCSTRING_CHECK_PY
       run: |
         echo "Checking code comment density..."
         
-        cat > check_comments.py << 'PYTHONSCRIPT'
-import ast
-import os
-
-def count_comments_and_lines(file_path):
-    with open(file_path, 'r') as f:
-        lines = f.readlines()
-    
-    total_lines = len([line for line in lines if line.strip()])
-    comment_lines = len([line for line in lines if line.strip().startswith('#')])
-    
-    return total_lines, comment_lines
-
-total_code_lines = 0
-total_comment_lines = 0
-low_comment_files = []
-
-for root, dirs, files in os.walk('src'):
-    dirs[:] = [d for d in dirs if d != '__pycache__']
-    for file in files:
-        if file.endswith('.py') and not file.startswith('__'):
-            file_path = os.path.join(root, file)
-            code_lines, comment_lines = count_comments_and_lines(file_path)
+        # Run Python script inline to check comments
+        python3 -c "
+        import os
+        
+        def count_comments_and_lines(file_path):
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
             
-            if code_lines > 20:  # Only check files with substantial code
-                comment_ratio = comment_lines / code_lines if code_lines > 0 else 0
-                
-                if comment_ratio < 0.1:  # Less than 10% comments
-                    low_comment_files.append(f'{file_path} ({comment_ratio:.1%})')
-                
-                total_code_lines += code_lines
-                total_comment_lines += comment_lines
-
-overall_ratio = total_comment_lines / total_code_lines if total_code_lines > 0 else 0
-
-print(f'Overall comment ratio: {overall_ratio:.1%}')
-print(f'Files with low comment density: {len(low_comment_files)}')
-
-if overall_ratio < 0.1 or len(low_comment_files) > 5:
-    print('needs_more_comments=true')
-    with open('low_comment_files.txt', 'w') as f:
-        f.write('\n'.join(low_comment_files))
-else:
-    print('needs_more_comments=false')
-PYTHONSCRIPT
-        python3 check_comments.py > comment_check.log 2>&1
-        rm -f check_comments.py
+            total_lines = len([line for line in lines if line.strip()])
+            comment_lines = len([line for line in lines if line.strip().startswith('#')])
+            
+            return total_lines, comment_lines
+        
+        total_code_lines = 0
+        total_comment_lines = 0
+        low_comment_files = []
+        
+        for root, dirs, files in os.walk('src'):
+            dirs[:] = [d for d in dirs if d != '__pycache__']
+            for file in files:
+                if file.endswith('.py') and not file.startswith('__'):
+                    file_path = os.path.join(root, file)
+                    code_lines, comment_lines = count_comments_and_lines(file_path)
+                    
+                    if code_lines > 20:  # Only check files with substantial code
+                        comment_ratio = comment_lines / code_lines if code_lines > 0 else 0
+                        
+                        if comment_ratio < 0.1:  # Less than 10% comments
+                            low_comment_files.append(f'{file_path} ({comment_ratio:.1%})')
+                        
+                        total_code_lines += code_lines
+                        total_comment_lines += comment_lines
+        
+        overall_ratio = total_comment_lines / total_code_lines if total_code_lines > 0 else 0
+        
+        print(f'Overall comment ratio: {overall_ratio:.1%}')
+        print(f'Files with low comment density: {len(low_comment_files)}')
+        
+        if overall_ratio < 0.1 or len(low_comment_files) > 5:
+            print('needs_more_comments=true')
+            with open('low_comment_files.txt', 'w') as f:
+                f.write('\\n'.join(low_comment_files))
+        else:
+            print('needs_more_comments=false')
+        " > comment_check.log 2>&1
         
         if grep -q "needs_more_comments=true" comment_check.log; then
           echo "needs_comments=true" >> $GITHUB_OUTPUT
