@@ -51,7 +51,7 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          python -c "
+          python3 << 'EOF' || echo "safety_issues=true" >> $GITHUB_OUTPUT
 import json, sys
 with open('safety-report.json', 'r') as f:
     data = json.load(f)
@@ -59,11 +59,11 @@ with open('safety-report.json', 'r') as f:
     if vulns:
         print(f'Found {len(vulns)} vulnerabilities')
         for vuln in vulns[:5]:  # Show first 5
-            print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
+            print(f'- {vuln.get("package_name", "unknown")}: {vuln.get("vulnerability_id", "unknown")}')
         sys.exit(1)
     else:
         print('No vulnerabilities found')
-" || echo "safety_issues=true" >> $GITHUB_OUTPUT
+EOF
         fi
         
     - name: Run Bandit Security Scan
@@ -74,7 +74,7 @@ with open('safety-report.json', 'r') as f:
         
         if [ -f bandit-report.json ]; then
           # Parse bandit report
-          python -c "
+          python3 << 'EOF' || echo "bandit_issues=true" >> $GITHUB_OUTPUT
 import json, sys
 with open('bandit-report.json', 'r') as f:
     data = json.load(f)
@@ -85,14 +85,14 @@ with open('bandit-report.json', 'r') as f:
     if high_severity:
         print(f'Found {len(high_severity)} HIGH severity issues')
         for issue in high_severity[:3]:
-            print(f'- {issue.get(\"test_name\", \"unknown\")}: {issue.get(\"issue_text\", \"\")}')
+            print(f'- {issue.get("test_name", "unknown")}: {issue.get("issue_text", "")}')
         sys.exit(1)
     elif medium_severity:
         print(f'Found {len(medium_severity)} MEDIUM severity issues')
         sys.exit(1)
     else:
         print('No high/medium security issues found')
-" || echo "bandit_issues=true" >> $GITHUB_OUTPUT
+EOF
         fi
         
     - name: Run pip-audit
