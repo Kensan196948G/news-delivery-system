@@ -49,8 +49,7 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          python -c " import json, sys with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
-    data = json.load(f)
+          python -c " import json, sys with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
     vulns = data.get('vulnerabilities', [])
     if vulns:
         print(f'Found {len(vulns)} vulnerabilities')
