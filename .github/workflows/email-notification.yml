@@ -64,15 +64,11 @@ jobs:
         
         # GitHub Issue/PR情報追加
         if [ -n "${{ inputs.issue_number }}" ]; then
-          BODY="$BODY
-
-🔗 関連Issue: https://github.com/${{ github.repository }}/issues/${{ inputs.issue_number }}"
+          BODY="$BODY\n\n🔗 関連Issue: https://github.com/${{ github.repository }}/issues/${{ inputs.issue_number }}"
         fi
         
         if [ -n "${{ inputs.pr_number }}" ]; then
-          BODY="$BODY
-
-🔗 関連PR: https://github.com/${{ github.repository }}/pull/${{ inputs.pr_number }}"
+          BODY="$BODY\n\n🔗 関連PR: https://github.com/${{ github.repository }}/pull/${{ inputs.pr_number }}"
         fi
         
         # 出力設定

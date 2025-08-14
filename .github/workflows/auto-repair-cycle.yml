@@ -292,48 +292,34 @@ jobs:
           const pr = await github.rest.pulls.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            title: `🤖 自動修復: システム問題解決 (${new Date().toLocaleDateString('ja-JP')})`,
+            title: '🤖 自動修復: システム問題解決 (' + new Date().toLocaleDateString('ja-JP') + ')' ,
             head: branchName,
             base: 'main',
-            body: `
-## 🔧 自動修復レポート
-
-**修復時刻**: ${new Date().toLocaleString('ja-JP')}
-**検出問題**: ${{ needs.error-detection.outputs.issues_found }}件
-**修復方法**: 完全自動化
-
-### 🎯 修復内容
-
-${{ needs.error-detection.outputs.issue_types }}の問題を自動解決:
-
-- ✅ **依存関係修復**: 競合解決・バージョン最適化
-- ✅ **コード品質向上**: フォーマット・リント修正
-- ✅ **セキュリティ強化**: 低リスク問題自動修正
-- ✅ **ファイル復元**: 不足設定ファイル補完
-
-### 🔄 運用サイクル
-
-\`\`\`
-エラー検知(30分おき) → 自動修復 → [PR作成] → レビュー → マージ → デプロイ
-\`\`\`
-
-### ⚡ 品質向上効果
-
-- **修復速度**: 数分で完了
-- **人的工数**: ゼロ（完全自動化）
-- **品質維持**: 継続的な改善
-- **24/7監視**: 人間の監視不要
-
-### 🧪 検証項目
-
-- [ ] 自動修復内容の確認
-- [ ] テスト実行結果
-- [ ] セキュリティスキャン通過
-
----
-
-**🤖 完全自動生成**: Auto-Repair Cycle System
-            `,
+            body: '## 🔧 自動修復レポート\\n\\n' +
+              '**修復時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
+              '**検出問題**: ${{ needs.error-detection.outputs.issues_found }}件\\n' +
+              '**修復方法**: 完全自動化\\n\\n' +
+              '### 🎯 修復内容\\n\\n' +
+              '${{ needs.error-detection.outputs.issue_types }}の問題を自動解決:\\n\\n' +
+              '- ✅ **依存関係修復**: 競合解決・バージョン最適化\\n' +
+              '- ✅ **コード品質向上**: フォーマット・リント修正\\n' +
+              '- ✅ **セキュリティ強化**: 低リスク問題自動修正\\n' +
+              '- ✅ **ファイル復元**: 不足設定ファイル補完\\n\\n' +
+              '### 🔄 運用サイクル\\n\\n' +
+              '```\\n' +
+              'エラー検知(30分おき) → 自動修復 → [PR作成] → レビュー → マージ → デプロイ\\n' +
+              '```\\n\\n' +
+              '### ⚡ 品質向上効果\\n\\n' +
+              '- **修復速度**: 数分で完了\\n' +
+              '- **人的工数**: ゼロ（完全自動化）\\n' +
+              '- **品質維持**: 継続的な改善\\n' +
+              '- **24/7監視**: 人間の監視不要\\n\\n' +
+              '### 🧪 検証項目\\n\\n' +
+              '- [ ] 自動修復内容の確認\\n' +
+              '- [ ] テスト実行結果\\n' +
+              '- [ ] セキュリティスキャン通過\\n\\n' +
+              '---\\n\\n' +
+              '**🤖 完全自動生成**: Auto-Repair Cycle System',
             draft: false
           });
           
@@ -359,38 +345,29 @@ ${{ needs.error-detection.outputs.issue_types }}の問題を自動解決:
       uses: actions/github-script@v7
       with:
         script: |
-          const issueTitle = `🔍 自動監視: システム問題追跡 (${new Date().toLocaleDateString('ja-JP')})`;
-          const issueBody = `
-## 📊 24/7継続監視レポート
-
-**検出時刻**: ${new Date().toLocaleString('ja-JP')}
-**検出問題数**: ${{ needs.error-detection.outputs.issues_found }}件
-**問題タイプ**: ${{ needs.error-detection.outputs.issue_types }}
-
-### 🔄 自動運用サイクル進行状況
-
-\`\`\`
-✅ エラー検知(30分おき) → ✅ 自動修復 → ✅ PR作成 → ⏳ レビュー → ⏳ マージ → ⏳ デプロイ
-          ↓
-✅ Issue自動作成 → [分析・応答] → コマンド実行 → 解決 → 自動クローズ
-\`\`\`
-
-### 🎯 自動化による改善
-
-- ✅ **問題検出**: 人間の監視なしで24/7継続監視
-- ✅ **修復速度**: 数分で自動修復・PR作成  
-- ✅ **品質向上**: 継続的なコード品質・セキュリティ維持
-- ✅ **工数削減**: 定型的な修復作業の自動化
-
-### 🤖 利用可能コマンド
-
-このIssueで以下のコマンドが使用可能:
-
-- \`/analyze\` - 詳細分析実行
-- \`/repair\` - 追加修復実行  
-- \`/merge\` - 自動マージ承認
-- \`/close\` - Issue解決・クローズ
-- \`/escalate\` - 人間レビュー要求
+          const issueTitle = '🔍 自動監視: システム問題追跡 (' + new Date().toLocaleDateString('ja-JP') + ')';
+          const issueBody = '## 📊 24/7継続監視レポート\\n\\n' +
+            '**検出時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
+            '**検出問題数**: ${{ needs.error-detection.outputs.issues_found }}件\\n' +
+            '**問題タイプ**: ${{ needs.error-detection.outputs.issue_types }}\\n\\n' +
+            '### 🔄 自動運用サイクル進行状況\\n\\n' +
+            '```\\n' +
+            '✅ エラー検知(30分おき) → ✅ 自動修復 → ✅ PR作成 → ⏳ レビュー → ⏳ マージ → ⏳ デプロイ\\n' +
+            '          ↓\\n' +
+            '✅ Issue自動作成 → [分析・応答] → コマンド実行 → 解決 → 自動クローズ\\n' +
+            '```\\n\\n' +
+            '### 🎯 自動化による改善\\n\\n' +
+            '- ✅ **問題検出**: 人間の監視なしで24/7継続監視\\n' +
+            '- ✅ **修復速度**: 数分で自動修復・PR作成\\n' +
+            '- ✅ **品質向上**: 継続的なコード品質・セキュリティ維持\\n' +
+            '- ✅ **工数削減**: 定型的な修復作業の自動化\\n\\n' +
+            '### 🤖 利用可能コマンド\\n\\n' +
+            'このIssueで以下のコマンドが使用可能:\\n\\n' +
+            '- `/analyze` - 詳細分析実行\\n' +
+            '- `/repair` - 追加修復実行\\n' +
+            '- `/merge` - 自動マージ承認\\n' +
+            '- `/close` - Issue解決・クローズ\\n' +
+            '- `/escalate` - 人間レビュー要求'
 
 ### 📈 監視メトリクス
 
