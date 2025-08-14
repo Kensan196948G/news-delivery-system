@@ -86,18 +86,17 @@ jobs:
           }
           
           // Add welcome comment with guidance
-          const welcomeComment = '👋 Thanks for opening this issue!\n\n🤖 **Auto-triage results:**\n' + labels.length > 0 ? '- Labels added: $\{\{labels.join(', ') + '' : '- No automatic labels applied'\}\}
-$\{\{assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') + '' : ''\}\}
-
-📋 **Next steps:**
-- A maintainer will review this issue shortly
-- Please ensure all required information is provided
-- Check if similar issues already exist
-
-💡 **Tips:**
-- Add \'[HIGH PRIORITY]\' to title for urgent issues
-- Include steps to reproduce for bugs
-- Provide examples for feature requests`;
+          const welcomeComment = '👋 Thanks for opening this issue!\n\n🤖 **Auto-triage results:**\n' + 
+            (labels.length > 0 ? '- Labels added: ' + labels.join(', ') : '- No automatic labels applied') + '\n' +
+            (assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') : '') + '\n\n' +
+            '📋 **Next steps:**\n' +
+            '- A maintainer will review this issue shortly\n' +
+            '- Please ensure all required information is provided\n' +
+            '- Check if similar issues already exist\n\n' +
+            '💡 **Tips:**\n' +
+            '- Add \'[HIGH PRIORITY]\' to title for urgent issues\n' +
+            '- Include steps to reproduce for bugs\n' +
+            '- Provide examples for feature requests';
 
           await github.rest.issues.createComment({
             owner: context.repo.owner,
