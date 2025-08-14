@@ -31,9 +31,9 @@ jobs:
   error-detection:
     runs-on: ubuntu-latest
     outputs:
-      issues_found: $\{\{{ steps.detect.outputs.issues_found \}\}}
-      repair_needed: $\{\{{ steps.detect.outputs.repair_needed \}\}}
-      issue_types: $\{\{{ steps.detect.outputs.issue_types \}\}}
+      issues_found: ${{ steps.detect.outputs.issues_found }}
+      repair_needed: ${{ steps.detect.outputs.repair_needed }}
+      issue_types: ${{ steps.detect.outputs.issue_types }}
     
     steps:
     - uses: actions/checkout@v4
@@ -136,13 +136,13 @@ jobs:
     if: needs.error-detection.outputs.repair_needed == 'true'
     runs-on: ubuntu-latest
     outputs:
-      repair_successful: $\{\{{ steps.repair.outputs.repair_successful \}\}}
-      pr_needed: $\{\{{ steps.repair.outputs.pr_needed \}\}}
+      repair_successful: ${{ steps.repair.outputs.repair_successful }}
+      pr_needed: ${{ steps.repair.outputs.pr_needed }}
     
     steps:
     - uses: actions/checkout@v4
       with:
-        token: $\{\{{ secrets.GITHUB_TOKEN \}\}}
+        token: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -173,7 +173,7 @@ jobs:
         git checkout -b "$REPAIR_BRANCH"
         
         # 1. 依存関係自動修復
-        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "dependency"; then
+        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "dependency"; then
           echo "📦 依存関係修復中..."
           
           # 競合解決
@@ -188,7 +188,7 @@ jobs:
         fi
         
         # 2. コード品質自動修復
-        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "quality"; then
+        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "quality"; then
           echo "📝 コード品質修復中..."
           
           # 自動フォーマット
@@ -201,7 +201,7 @@ jobs:
         fi
         
         # 3. セキュリティ問題自動修復（低リスクのみ）
-        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "security"; then
+        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "security"; then
           echo "🛡️ セキュリティ修復中..."
           
           # 安全な自動修復のみ実行
@@ -214,7 +214,7 @@ jobs:
         fi
         
         # 4. 不足ファイル自動復元
-        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "missing_file"; then
+        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "missing_file"; then
           echo "📁 不足ファイル復元中..."
           
           # 基本的なファイル復元
@@ -269,7 +269,7 @@ jobs:
     if: needs.auto-repair.outputs.pr_needed == 'true'
     runs-on: ubuntu-latest
     outputs:
-      pr_number: $\{\{{ steps.create-pr.outputs.pr_number \}\}}
+      pr_number: ${{ steps.create-pr.outputs.pr_number }}
     
     steps:
     - uses: actions/checkout@v4
@@ -297,10 +297,10 @@ jobs:
             base: 'main',
             body: '## 🔧 自動修復レポート\\n\\n' +
               '**修復時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
-              '**検出問題**: $\{\{{ needs.error-detection.outputs.issues_found \}\}}件\\n' +
+              '**検出問題**: ${{ needs.error-detection.outputs.issues_found }}件\\n' +
               '**修復方法**: 完全自動化\\n\\n' +
               '### 🎯 修復内容\\n\\n' +
-              '$\{\{{ needs.error-detection.outputs.issue_types \}\}}の問題を自動解決:\\n\\n' +
+              '${{ needs.error-detection.outputs.issue_types }}の問題を自動解決:\\n\\n' +
               '- ✅ **依存関係修復**: 競合解決・バージョン最適化\\n' +
               '- ✅ **コード品質向上**: フォーマット・リント修正\\n' +
               '- ✅ **セキュリティ強化**: 低リスク問題自動修正\\n' +
@@ -354,9 +354,9 @@ jobs:
       run: |
         echo "=== 🔄 自動運用サイクル完了レポート ===" 
         echo "📅 実行日時: $(date '+%Y-%m-%d %H:%M:%S JST')"
-        echo "🔍 検出問題: $\{\{{ needs.error-detection.outputs.issues_found \}\}}件"
-        echo "🔧 修復実行: $\{\{{ needs.auto-repair.outputs.repair_successful \}\}}"
-        echo "📝 PR作成: $\{\{{ needs.auto-repair.outputs.pr_needed \}\}}"
+        echo "🔍 検出問題: ${{ needs.error-detection.outputs.issues_found }}件"
+        echo "🔧 修復実行: ${{ needs.auto-repair.outputs.repair_successful }}"
+        echo "📝 PR作成: ${{ needs.auto-repair.outputs.pr_needed }}"
         echo ""
         echo "🎯 自動化効果:"
         echo "- ✅ 24/7継続監視: 人間の介入不要"

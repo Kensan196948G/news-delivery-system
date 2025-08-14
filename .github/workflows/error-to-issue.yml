@@ -30,7 +30,7 @@ jobs:
             state: 'open'
           });
           
-          const workflowName = '$\{\{{ github.event.workflow_run.name \}\}}';
+          const workflowName = '${{ github.event.workflow_run.name }}';
           const existingIssue = issues.find(issue => 
             issue.title.includes(workflowName)
           );
@@ -96,7 +96,7 @@ jobs:
             workflow_id: 'self-heal.yml',
             ref: 'main',
             inputs: {
-              issue_number: '$\{\{{ steps.create_issue.outputs.result \}\}}',
+              issue_number: '${{ steps.create_issue.outputs.result }}',
               error_type: 'ci_failure'
             }
           });
@@ -141,7 +141,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const issueNumber = $\{\{{ needs.check-and-create-issue.outputs.issue_number \}\}};
+          const issueNumber = ${{ needs.check-and-create-issue.outputs.issue_number }};
           if (issueNumber) {
             await github.rest.issues.createComment({
               owner: context.repo.owner,

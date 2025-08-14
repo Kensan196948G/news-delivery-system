@@ -19,7 +19,7 @@ jobs:
           const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            run_id: $\{\{{ github.event.workflow_run.id \}\}}
+            run_id: ${{ github.event.workflow_run.id }}
           });
           
           console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
@@ -146,19 +146,19 @@ jobs:
         cat > quality-gate-report.md << 'EOF'
         # 🔍 Quality Gate Report
         
-        **Build:** $\{\{{ github.event.workflow_run.html_url \}\}}
-        **Commit:** $\{\{{ github.event.workflow_run.head_sha \}\}}
-        **Branch:** $\{\{{ github.event.workflow_run.head_branch \}\}}
+        **Build:** ${{ github.event.workflow_run.html_url }}
+        **Commit:** ${{ github.event.workflow_run.head_sha }}
+        **Branch:** ${{ github.event.workflow_run.head_branch }}
         **Timestamp:** $(date -u)
         
         ## 📊 Overall Result
         
         | Metric | Result |
         |--------|--------|
-        | **Quality Gate** | $\{\{{ steps.quality-check.outputs.quality_gate \}\}} |
-        | **Quality Score** | $\{\{{ steps.quality-check.outputs.quality_score \}\}}/100 |
-        | **Total Issues** | $\{\{{ steps.quality-check.outputs.total_issues \}\}} |
-        | **Critical Issues** | $\{\{{ steps.quality-check.outputs.critical_issues \}\}} |
+        | **Quality Gate** | ${{ steps.quality-check.outputs.quality_gate }} |
+        | **Quality Score** | ${{ steps.quality-check.outputs.quality_score }}/100 |
+        | **Total Issues** | ${{ steps.quality-check.outputs.total_issues }} |
+        | **Critical Issues** | ${{ steps.quality-check.outputs.critical_issues }} |
         
         ## 🎯 Quality Standards
         
@@ -170,7 +170,7 @@ jobs:
         
         EOF
         
-        if [ "$\{\{{ steps.quality-check.outputs.quality_gate \}\}}" = "FAILED" ]; then
+        if [ "${{ steps.quality-check.outputs.quality_gate }}" = "FAILED" ]; then
           cat >> quality-gate-report.md << 'EOF'
         
         ### 🚨 Critical Actions Required
@@ -181,7 +181,7 @@ jobs:
         - **Deployment is blocked until issues are resolved**
         
         EOF
-        elif [ "$\{\{{ steps.quality-check.outputs.quality_gate \}\}}" = "WARNING" ]; then
+        elif [ "${{ steps.quality-check.outputs.quality_gate }}" = "WARNING" ]; then
           cat >> quality-gate-report.md << 'EOF'
         
         ### ⚠️ Improvements Recommended
@@ -236,16 +236,16 @@ jobs:
     - name: Upload Quality Gate Report
       uses: actions/upload-artifact@v4
       with:
-        name: quality-gate-report-$\{\{{ github.event.workflow_run.head_sha \}\}}
+        name: quality-gate-report-${{ github.event.workflow_run.head_sha }}
         path: quality-gate-report.md
         
     - name: Set Quality Gate Status
       if: github.event.workflow_run.event == 'push'
       run: |
-        if [ "$\{\{{ steps.quality-check.outputs.quality_gate \}\}}" = "FAILED" ]; then
+        if [ "${{ steps.quality-check.outputs.quality_gate }}" = "FAILED" ]; then
           echo "❌ Quality Gate Failed - Blocking deployment"
           exit 1
-        elif [ "$\{\{{ steps.quality-check.outputs.quality_gate \}\}}" = "WARNING" ]; then
+        elif [ "${{ steps.quality-check.outputs.quality_gate }}" = "WARNING" ]; then
           echo "⚠️ Quality Gate Warning - Deployment allowed with caution"
           exit 0
         else

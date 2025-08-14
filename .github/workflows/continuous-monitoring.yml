@@ -163,7 +163,7 @@ jobs:
     - name: Upload Health Report
       uses: actions/upload-artifact@v4
       with:
-        name: health-report-$\{\{{ github.run_number \}\}}
+        name: health-report-${{ github.run_number }}
         path: |
           health-report.md
           safety-quick.json
@@ -174,5 +174,5 @@ jobs:
         echo "=== 継続的監視完了 ===" 
         echo "🕐 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST')"
         echo "📊 システム状態: $HEALTH_STATUS"
-        echo "📁 レポート: health-report-$\{\{{ github.run_number \}\}}"
+        echo "📁 レポート: health-report-${{ github.run_number }}"
         echo "⏰ 次回実行: 30分後"

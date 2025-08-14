@@ -30,8 +30,8 @@ jobs:
       run: |
         echo "=== 🤖 スマートコミット戦略 ===" 
         
-        BATCH_SIZE="$\{\{{ github.event.inputs.commit_batch_size \}\}}"
-        DELAY_MINUTES="$\{\{{ github.event.inputs.delay_minutes \}\}}"
+        BATCH_SIZE="${{ github.event.inputs.commit_batch_size }}"
+        DELAY_MINUTES="${{ github.event.inputs.delay_minutes }}"
         
         echo "📊 設定:"
         echo "- バッチサイズ: $\{\{BATCH_SIZE\}\}ファイル"

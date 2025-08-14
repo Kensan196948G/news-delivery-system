@@ -36,8 +36,8 @@ jobs:
     - name: Determine Backup Type
       id: backup-type
       run: |
-        if [ "$\{\{{ github.event.inputs.backup_type \}\}}" != "" ]; then
-          BACKUP_TYPE="$\{\{{ github.event.inputs.backup_type \}\}}"
+        if [ "${{ github.event.inputs.backup_type }}" != "" ]; then
+          BACKUP_TYPE="${{ github.event.inputs.backup_type }}"
         elif [ "$(date '+%M')" = "00" ]; then
           BACKUP_TYPE="full"
         else
@@ -156,7 +156,7 @@ jobs:
       if: env.BACKUP_STATUS == 'SUCCESS'
       uses: actions/upload-artifact@v4
       with:
-        name: automated-backup-$\{\{{ steps.backup-type.outputs.backup_type \}\}}-$\{\{{ github.run_number \}\}}
+        name: automated-backup-${{ steps.backup-type.outputs.backup_type }}-${{ github.run_number }}
         path: |
           backup-*/
           incremental-*/
@@ -188,6 +188,6 @@ jobs:
         echo "🕐 実行完了: $(date '+%Y-%m-%d %H:%M:%S JST')"
         echo "📦 バックアップタイプ: $BACKUP_TYPE"
         echo "✅ ステータス: $BACKUP_STATUS"
-        echo "📁 アーティファクト: automated-backup-$\{\{{ steps.backup-type.outputs.backup_type \}\}}-$\{\{{ github.run_number \}\}}"
+        echo "📁 アーティファクト: automated-backup-${{ steps.backup-type.outputs.backup_type }}-${{ github.run_number }}"
         echo "⏰ 次回フル実行: $(date -d '+1 hour' '+%H:00 JST')"
         echo "⏰ 次回チェック: $(date -d '+30 minutes' '+%H:%M JST')"

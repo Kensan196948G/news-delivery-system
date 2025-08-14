@@ -18,15 +18,15 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: $\{\{{ env.PYTHON_VERSION \}\}}
+        python-version: ${{ env.PYTHON_VERSION }}
         
     - name: Cache pip dependencies
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: $\{\{{ runner.os \}\}}-pip-$\{\{{ hashFiles('**/requirements*.txt') \}\}}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
-          $\{\{{ runner.os \}\}}-pip-
+          ${{ runner.os }}-pip-
         
     - name: Install dependencies
       run: |
@@ -121,19 +121,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python $\{\{{ matrix.python-version \}\}}
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: $\{\{{ matrix.python-version \}\}}
+        python-version: ${{ matrix.python-version }}
         
     - name: Cache pip dependencies
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: $\{\{{ runner.os \}\}}-pip-$\{\{{ matrix.python-version \}\}}-$\{\{{ hashFiles('**/requirements*.txt') \}\}}
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
-          $\{\{{ runner.os \}\}}-pip-$\{\{{ matrix.python-version \}\}}-
-          $\{\{{ runner.os \}\}}-pip-
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
         
     - name: Install dependencies
       run: |
@@ -168,7 +168,7 @@ jobs:
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report-$\{\{{ matrix.python-version \}\}}
+        name: coverage-report-${{ matrix.python-version }}
         path: htmlcov/
 
   integration-tests:
@@ -192,7 +192,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: $\{\{{ env.PYTHON_VERSION \}\}}
+        python-version: ${{ env.PYTHON_VERSION }}
         
     - name: Install system dependencies
       run: |
@@ -203,9 +203,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: $\{\{{ runner.os \}\}}-pip-$\{\{{ hashFiles('**/requirements*.txt') \}\}}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
-          $\{\{{ runner.os \}\}}-pip-
+          ${{ runner.os }}-pip-
         
     - name: Install dependencies
       run: |
@@ -247,7 +247,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: $\{\{{ env.PYTHON_VERSION \}\}}
+        python-version: ${{ env.PYTHON_VERSION }}
         
     - name: Install build dependencies
       run: |
@@ -282,7 +282,7 @@ jobs:
     - name: Upload deployment artifact
       uses: actions/upload-artifact@v4
       with:
-        name: deployment-package-$\{\{{ github.sha \}\}}
+        name: deployment-package-${{ github.sha }}
         path: news-delivery-system-*.tar.gz
         retention-days: 30
 
@@ -317,7 +317,7 @@ jobs:
     - name: Download deployment artifact
       uses: actions/download-artifact@v4
       with:
-        name: deployment-package-$\{\{{ github.sha \}\}}
+        name: deployment-package-${{ github.sha }}
         
     - name: Deploy to staging
       run: |
@@ -341,7 +341,7 @@ jobs:
     - name: Download deployment artifact
       uses: actions/download-artifact@v4
       with:
-        name: deployment-package-$\{\{{ github.sha \}\}}
+        name: deployment-package-${{ github.sha }}
         
     - name: Deploy to production
       run: |
@@ -373,10 +373,10 @@ jobs:
         echo "## Overall Status" >> quality-report.md
         
         # Check job statuses
-        if [[ "$\{\{{ needs.code-quality.result \}\}}" == "success" && 
-              "$\{\{{ needs.unit-tests.result \}\}}" == "success" && 
-              "$\{\{{ needs.integration-tests.result \}\}}" == "success" && 
-              "$\{\{{ needs.security-scan.result \}\}}" == "success" ]]; then
+        if [[ "${{ needs.code-quality.result }}" == "success" && 
+              "${{ needs.unit-tests.result }}" == "success" && 
+              "${{ needs.integration-tests.result }}" == "success" && 
+              "${{ needs.security-scan.result }}" == "success" ]]; then
           echo "✅ **Quality Gate: PASSED**" >> quality-report.md
           echo "QUALITY_GATE_PASSED=true" >> $GITHUB_ENV
         else
@@ -386,10 +386,10 @@ jobs:
         
         echo "" >> quality-report.md
         echo "## Job Results" >> quality-report.md
-        echo "- Code Quality: $\{\{{ needs.code-quality.result == 'success' && '✅' || '❌' \}\}} $\{\{{ needs.code-quality.result \}\}}" >> quality-report.md
-        echo "- Unit Tests: $\{\{{ needs.unit-tests.result == 'success' && '✅' || '❌' \}\}} $\{\{{ needs.unit-tests.result \}\}}" >> quality-report.md
-        echo "- Integration Tests: $\{\{{ needs.integration-tests.result == 'success' && '✅' || '❌' \}\}} $\{\{{ needs.integration-tests.result \}\}}" >> quality-report.md
-        echo "- Security Scan: $\{\{{ needs.security-scan.result == 'success' && '✅' || '❌' \}\}} $\{\{{ needs.security-scan.result \}\}}" >> quality-report.md
+        echo "- Code Quality: ${{ needs.code-quality.result == 'success' && '✅' || '❌' }} ${{ needs.code-quality.result }}" >> quality-report.md
+        echo "- Unit Tests: ${{ needs.unit-tests.result == 'success' && '✅' || '❌' }} ${{ needs.unit-tests.result }}" >> quality-report.md
+        echo "- Integration Tests: ${{ needs.integration-tests.result == 'success' && '✅' || '❌' }} ${{ needs.integration-tests.result }}" >> quality-report.md
+        echo "- Security Scan: ${{ needs.security-scan.result == 'success' && '✅' || '❌' }} ${{ needs.security-scan.result }}" >> quality-report.md
         
         cat quality-report.md
         
