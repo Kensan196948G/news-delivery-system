@@ -175,7 +175,15 @@ jobs:
       
       - name: Create deployment artifact
         run: |
-          tar -czf deployment.tar.gz --exclude='.git' --exclude='*.pyc' --exclude='__pycache__' .
+          # Create the archive, excluding the archive file itself to prevent recursion
+          tar -czf deployment.tar.gz \
+            --exclude='.git' \
+            --exclude='*.pyc' \
+            --exclude='__pycache__' \
+            --exclude='deployment.tar.gz' \
+            --exclude='.github/workflows-disabled' \
+            --exclude='.github/workflows-backup' \
+            .
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
