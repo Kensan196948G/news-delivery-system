@@ -68,16 +68,16 @@ jobs:
           .
           
         # バックアップ情報記録
-        cat > "$BACKUP_DIR/backup-info.txt" << EOF
-バックアップ情報
-================
-日時: $(date '+%Y-%m-%d %H:%M:%S JST')
-タイプ: フル ($BACKUP_TYPE)
-コミット: $(git rev-parse HEAD)
-ブランチ: $(git branch --show-current)
-ファイル数: $(find . -type f ! -path './.git/*' | wc -l)
-サイズ: $(du -sh . | cut -f1)
-EOF
+        {
+          echo "Backup Information"
+          echo "=================="
+          echo "Date: $(date '+%Y-%m-%d %H:%M:%S JST')"
+          echo "Type: Full ($BACKUP_TYPE)"
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Branch: $(git branch --show-current)"
+          echo "Files: $(find . -type f ! -path './.git/*' | wc -l)"
+          echo "Size: $(du -sh . | cut -f1)"
+        } > "$BACKUP_DIR/backup-info.txt"
         
         # Git状態記録
         git status > "$BACKUP_DIR/git-status.txt"
