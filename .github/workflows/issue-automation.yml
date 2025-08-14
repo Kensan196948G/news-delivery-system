@@ -188,16 +188,13 @@ jobs:
               .map(item => `- #${item.number}: ${item.title}`)
               .join('\n');
             
-            const comment = `🔍 **Potential duplicate issues detected:**
-
-${duplicateList}
-
-Please check if your issue is already covered by one of the above. If this is a different issue, please provide more specific details to help distinguish it.
-
-If this is indeed a duplicate, please:
-1. Add your use case details to the existing issue
-2. Close this issue
-3. Subscribe to the existing issue for updates`;
+            const comment = '🔍 **Potential duplicate issues detected:**\n\n' +
+              duplicateList + '\n\n' +
+              'Please check if your issue is already covered by one of the above. If this is a different issue, please provide more specific details to help distinguish it.\n\n' +
+              'If this is indeed a duplicate, please:\n' +
+              '1. Add your use case details to the existing issue\n' +
+              '2. Close this issue\n' +
+              '3. Subscribe to the existing issue for updates';
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
