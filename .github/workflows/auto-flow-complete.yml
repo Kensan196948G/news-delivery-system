@@ -100,7 +100,7 @@ jobs:
         echo "⚙️ システム整合性検査中..."
         critical_files=("requirements.txt" ".github/workflows/ci-cd.yml" "README.md")
         missing_files=0
-        for file in "$\{\{critical_files[@]\}\}"; do
+        for file in "${critical_files[@]}"; do
           if [ ! -f "$file" ]; then
             missing_files=$((missing_files + 1))
             DETECTION_RESULTS+=("📁 不足ファイル: $file")
@@ -113,14 +113,14 @@ jobs:
         fi
         
         # 検知結果サマリー
-        DETECTION_SUMMARY="検知時刻: $(date '+%H:%M JST'), 問題数: $\{\{#DETECTION_RESULTS[@]\}\}, 重要度: $SEVERITY_LEVEL"
+        DETECTION_SUMMARY="検知時刻: $(date '+%H:%M JST'), 問題数: ${#DETECTION_RESULTS[@]}, 重要度: $SEVERITY_LEVEL"
         
         echo "problems_detected=$PROBLEMS_DETECTED" >> $GITHUB_OUTPUT
         echo "detection_summary=$DETECTION_SUMMARY" >> $GITHUB_OUTPUT
         
         echo "📊 検知結果:"
         echo "- 問題検出: $PROBLEMS_DETECTED"
-        echo "- 検出項目: $\{\{DETECTION_RESULTS[*]\}\}"
+        echo "- 検出項目: ${DETECTION_RESULTS[*]}"
         echo "- 重要度: $SEVERITY_LEVEL"
         
         # 検知結果をファイルに保存
@@ -132,7 +132,7 @@ jobs:
           echo "重要度レベル: $SEVERITY_LEVEL"
           echo ""
           echo "検出内容:"
-          printf '%s\n' "$\{\{DETECTION_RESULTS[@]\}\}"
+          printf '%s\n' "${DETECTION_RESULTS[@]}"
           echo ""
           echo "システム状態:"
           echo "- セキュリティ: $([ "$PROBLEMS_DETECTED" = "true" ] && echo "要注意" || echo "正常")"

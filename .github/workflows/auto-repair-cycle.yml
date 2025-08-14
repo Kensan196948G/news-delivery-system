@@ -104,7 +104,7 @@ jobs:
         # 4. 設定ファイル整合性検査
         echo "⚙️ 設定ファイル検査中..."
         critical_files=("requirements.txt" ".github/workflows/ci-cd.yml" "src/main.py")
-        for file in "$\{\{critical_files[@]\}\}"; do
+        for file in "${critical_files[@]}"; do
           if [ ! -f "$file" ]; then
             echo "❌ 重要ファイル不足: $file"
             ISSUES_FOUND=$((ISSUES_FOUND + 1))
@@ -123,12 +123,12 @@ jobs:
         # 結果出力
         echo "issues_found=$ISSUES_FOUND" >> $GITHUB_OUTPUT
         echo "repair_needed=$REPAIR_NEEDED" >> $GITHUB_OUTPUT
-        echo "issue_types=$(IFS=,; echo "$\{\{ISSUE_TYPES[*]\}\}")" >> $GITHUB_OUTPUT
+        echo "issue_types=$(IFS=,; echo "${ISSUE_TYPES[*]}")" >> $GITHUB_OUTPUT
         
         echo "📊 検出結果:"
         echo "- 検出問題数: $ISSUES_FOUND"
         echo "- 自動修復必要: $REPAIR_NEEDED"
-        echo "- 問題タイプ: $\{\{ISSUE_TYPES[*]\}\}"
+        echo "- 問題タイプ: ${ISSUE_TYPES[*]}"
 
   # 🔧 Phase 2: 自動修復
   auto-repair:
@@ -243,9 +243,9 @@ jobs:
         fi
         
         # 変更コミット
-        if [ $\{\{#CHANGES_MADE[@]\}\} -gt 0 ]; then
+        if [ ${#CHANGES_MADE[@]} -gt 0 ]; then
           git add -A
-          git commit -m "🤖 自動修復: $(IFS=,; echo "$\{\{CHANGES_MADE[*]\}\}") | 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | 修復タイプ: 完全自動化 | 🤖 Generated with Claude Code"
+          git commit -m "🤖 自動修復: $(IFS=,; echo "${CHANGES_MADE[*]}") | 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | 修復タイプ: 完全自動化 | 🤖 Generated with Claude Code"
 
           REPAIR_SUCCESSFUL=true
           PR_NEEDED=true
@@ -261,7 +261,7 @@ jobs:
         echo "📊 修復結果:"
         echo "- 修復成功: $REPAIR_SUCCESSFUL"
         echo "- PR作成必要: $PR_NEEDED"
-        echo "- 変更内容: $\{\{CHANGES_MADE[*]\}\}"
+        echo "- 変更内容: ${CHANGES_MADE[*]}"
 
   # 📝 Phase 3: PR作成
   create-repair-pr:

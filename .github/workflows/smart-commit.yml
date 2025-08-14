@@ -34,12 +34,12 @@ jobs:
         DELAY_MINUTES="${{ github.event.inputs.delay_minutes }}"
         
         echo "📊 設定:"
-        echo "- バッチサイズ: $\{\{BATCH_SIZE\}\}ファイル"
-        echo "- 待機時間: $\{\{DELAY_MINUTES\}\}分"
+        echo "- バッチサイズ: ${BATCH_SIZE}ファイル"
+        echo "- 待機時間: ${DELAY_MINUTES}分"
         
         # 変更ファイルを取得
         changed_files=($(git status --porcelain | head -n 50 | awk '{print $2}'))
-        total_files=$\{\{#changed_files[@]\}\}
+        total_files=${#changed_files[@]}
         
         echo "📁 変更ファイル数: $total_files"
         
@@ -57,14 +57,14 @@ jobs:
         for ((i=0; i<total_files; i+=BATCH_SIZE)); do
           batch_count=$((batch_count + 1))
           
-          echo "📦 バッチ $\{\{batch_count\}\} 処理中..."
+          echo "📦 バッチ ${batch_count} 処理中..."
           
           # 現在のバッチファイルを取得
-          batch_files=("$\{\{changed_files[@]:i:BATCH_SIZE\}\}")
+          batch_files=("${changed_files[@]:i:BATCH_SIZE}")
           
-          if [ $\{\{#batch_files[@]\}\} -gt 0 ]; then
+          if [ ${#batch_files[@]} -gt 0 ]; then
             # バッチファイルをステージング
-            for file in "$\{\{batch_files[@]\}\}"; do
+            for file in "${batch_files[@]}"; do
               if [ -f "$file" ]; then
                 git add "$file"
                 echo "  ✅ 追加: $file"
@@ -72,12 +72,12 @@ jobs:
             done
             
             # バッチコミット
-            git commit -m "feat: バッチ$\{\{batch_count\}\} - 機能追加・改善 | ファイル数: $\{\{#batch_files[@]\}\} | レート制限対策: スマートコミット戦略適用 | 🤖 Generated with Claude Code"
-            echo "✅ バッチ $\{\{batch_count\}\} コミット完了"
+            git commit -m "feat: バッチ${batch_count} - 機能追加・改善 | ファイル数: ${#batch_files[@]} | レート制限対策: スマートコミット戦略適用 | 🤖 Generated with Claude Code"
+            echo "✅ バッチ ${batch_count} コミット完了"
             
             # CodeRabbit AI レート制限対策の待機
             if [ $((i + BATCH_SIZE)) -lt $total_files ]; then
-              echo "⏰ $\{\{DELAY_MINUTES\}\}分待機中（レート制限対策）..."
+              echo "⏰ ${DELAY_MINUTES}分待機中（レート制限対策）..."
               sleep $((DELAY_MINUTES * 60))
             fi
           fi

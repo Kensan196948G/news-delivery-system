@@ -73,16 +73,16 @@ jobs:
         )
         
         missing_sections=()
-        for section in "$\{\{required_sections[@]\}\}"; do
+        for section in "${required_sections[@]}"; do
           if ! grep -qi "## $section\|# $section" README.md; then
             missing_sections+=("$section")
           fi
         done
         
-        if [ $\{\{#missing_sections[@]\}\} -gt 0 ]; then
-          echo "Missing README sections: $\{\{missing_sections[*]\}\}"
+        if [ ${#missing_sections[@]} -gt 0 ]; then
+          echo "Missing README sections: ${missing_sections[*]}"
           echo "missing_readme_sections=true" >> $GITHUB_OUTPUT
-          echo "$\{\{missing_sections[*]\}\}" > missing_readme_sections.txt
+          echo "${missing_sections[*]}" > missing_readme_sections.txt
         else
           echo "README.md is complete!"
           echo "missing_readme_sections=false" >> $GITHUB_OUTPUT
