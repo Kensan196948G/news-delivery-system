@@ -411,7 +411,7 @@ class GmailSender:
             
             # 英語が残っている場合は最初に説明を追加
             if any(char.isalpha() and ord(char) < 128 for char in result):
-                result = "海外ニュース: " + result
+                result = "※未翻訳記事: " + result
             
             return result
             

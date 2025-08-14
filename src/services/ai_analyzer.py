@@ -42,7 +42,7 @@ class ClaudeAnalyzer:
         self.client = anthropic.Anthropic(api_key=api_key)
         
         # Configuration
-        self.model = self.config.get('ai_analysis', 'claude', 'model', default='claude-3-sonnet-20240229')
+        self.model = self.config.get('ai_analysis', 'claude', 'model', default='claude-3-5-sonnet-20241022')
         self.max_tokens = self.config.get('ai_analysis', 'claude', 'max_tokens', default=4096)
         self.temperature = self.config.get('ai_analysis', 'claude', 'temperature', default=0.3)
         

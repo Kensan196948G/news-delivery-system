@@ -103,7 +103,7 @@ class Article:
         
         # Determine if article is urgent based on CLAUDE.md requirements
         self.is_urgent = (
-            self.importance_score >= 10 or 
+            (self.importance_score is not None and self.importance_score >= 10) or 
             (self.cvss_score is not None and self.cvss_score >= 9.0)
         )
         

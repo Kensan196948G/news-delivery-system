@@ -48,6 +48,7 @@
         "enabled": true,
         "count": 20,
         "priority": 6,
+        "use_nvd": false,
         "alert_threshold": 9.0
       }
     }

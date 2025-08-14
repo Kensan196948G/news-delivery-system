@@ -20,6 +20,7 @@ from enum import Enum
 from utils.config import get_config
 from utils.cache_manager import CacheManager
 from utils.rate_limiter import get_rate_limiter
+from utils.simple_translator import SimpleTranslator
 from models.article import Article, ArticleLanguage
 
 
@@ -74,8 +75,15 @@ class DeepLTranslator:
         
         # DeepL API設定
         self.api_key = self.config.get_env('DEEPL_API_KEY')
-        self.api_url = "https://api-free.deepl.com/v2/translate"
-        self.usage_url = "https://api-free.deepl.com/v2/usage"
+        # APIキーのフォーマットで無料版か有料版か判定
+        if self.api_key and ':fx' in self.api_key:
+            # 無料版のAPIキー（末尾に:fxがある）
+            self.api_url = "https://api-free.deepl.com/v2/translate"
+            self.usage_url = "https://api-free.deepl.com/v2/usage"
+        else:
+            # 有料版のAPIキー
+            self.api_url = "https://api.deepl.com/v2/translate"
+            self.usage_url = "https://api.deepl.com/v2/usage"
         
         # 使用量制限設定
         self.monthly_char_limit = self.config.get('translation.monthly_limit', default=500000)
@@ -122,19 +130,24 @@ class DeepLTranslator:
             # 翻訳実行
             translation_tasks = []
             
+            # ソース言語を判定（デフォルトは英語）
+            source_lang = 'en'
+            if hasattr(article, 'language') and article.language and hasattr(article.language, 'value'):
+                source_lang = article.language.value
+            
             if article.title:
                 translation_tasks.append(
-                    self._translate_text(article.title, article.language.value, 'ja')
+                    self._translate_text(article.title, source_lang, 'ja')
                 )
             
             if article.description:
                 translation_tasks.append(
-                    self._translate_text(article.description, article.language.value, 'ja')
+                    self._translate_text(article.description, source_lang, 'ja')
                 )
             
             if article.content:
                 translation_tasks.append(
-                    self._translate_text(article.content, article.language.value, 'ja')
+                    self._translate_text(article.content, source_lang, 'ja')
                 )
             
             # 並列実行
@@ -164,9 +177,10 @@ class DeepLTranslator:
             return article
             
         except Exception as e:
-            logger.error(f"Article translation failed: {e}")
+            logger.error(f"Article translation failed: {e}. Using fallback translator.")
             self.translation_stats['errors'] += 1
-            return article
+            # フォールバック: SimpleTranslatorを使用
+            return self._fallback_translation(article)
     
     async def translate_batch(self, articles: List[Article]) -> List[Article]:
         """記事のバッチ翻訳"""
@@ -280,7 +294,7 @@ class DeepLTranslator:
                 'detected_lang': result.detected_lang,
                 'confidence': result.confidence
             }
-            self.cache_manager.set(cache_key, cache_data, ttl=self.cache_ttl)
+            self.cache_manager.set(cache_key, cache_data, expire=self.cache_ttl)
             
             # 統計更新
             self.translation_stats['total_requests'] += 1
@@ -349,14 +363,21 @@ class DeepLTranslator:
             )
             
         except aiohttp.ClientError as e:
+            logger.error(f"Network error calling DeepL API: {e}")
             raise TranslationError(f"Network error calling DeepL API: {e}")
         except Exception as e:
+            logger.error(f"DeepL API call failed: {e}")
             raise TranslationError(f"DeepL API call failed: {e}")
     
     def _needs_translation(self, article: Article) -> bool:
         """翻訳が必要かチェック"""
+        # languageがNoneの場合は英語として扱う
+        if not hasattr(article, 'language') or article.language is None:
+            # タイトルや内容から言語を推定（英語と仮定）
+            return True
+            
         # 既に日本語の場合は翻訳不要
-        if article.language == Language.JAPANESE:
+        if article.language == ArticleLanguage.JAPANESE:
             return False
         
         # 既に翻訳済みの場合は翻訳不要
@@ -364,9 +385,10 @@ class DeepLTranslator:
             return False
         
         # 英語以外で翻訳可能な言語かチェック
-        if article.language.value not in self.supported_languages:
-            logger.warning(f"Unsupported language for translation: {article.language.value}")
-            return False
+        if hasattr(article.language, 'value'):
+            if article.language.value not in self.supported_languages:
+                logger.warning(f"Unsupported language for translation: {article.language.value}")
+                return False
         
         return True
     
@@ -456,6 +478,42 @@ class DeepLTranslator:
         except Exception as e:
             logger.error(f"Failed to clear translation cache: {e}")
             return 0
+    
+    def _fallback_translation(self, article: Article) -> Article:
+        """SimpleTranslatorを使用したフォールバック翻訳"""
+        try:
+            logger.info(f"Using fallback translator for article: {article.url}")
+            
+            # タイトルの翻訳
+            if article.title and not getattr(article, 'translated_title', None):
+                article.translated_title = SimpleTranslator.translate_text(article.title, max_length=100)
+            
+            # 説明の翻訳
+            if article.description and not getattr(article, 'translated_description', None):
+                article.translated_description = SimpleTranslator.translate_text(article.description, max_length=200)
+            
+            # 内容の翻訳または要約生成
+            if article.content and not getattr(article, 'translated_content', None):
+                # 長い内容は要約を生成
+                article.translated_content = SimpleTranslator.create_summary(
+                    article.title or '',
+                    article.content,
+                    max_length=250
+                )
+            
+            logger.info(f"Fallback translation completed for article: {article.url}")
+            return article
+            
+        except Exception as e:
+            logger.error(f"Fallback translation also failed: {e}")
+            # 最終的なフォールバック: 元のテキストに説明を追加
+            if article.title and not getattr(article, 'translated_title', None):
+                article.translated_title = f"【未翻訳】{article.title}"
+            if article.description and not getattr(article, 'translated_description', None):
+                article.translated_description = f"【未翻訳】{article.description}"
+            if article.content and not getattr(article, 'translated_content', None):
+                article.translated_content = f"【未翻訳記事】{article.content[:200]}..."
+            return article
 
 
 # グローバル翻訳インスタンス
