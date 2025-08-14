@@ -175,7 +175,16 @@ jobs:
       
       - name: Create deployment artifact
         run: |
-          tar -czf deployment.tar.gz --exclude='.git' --exclude='*.pyc' --exclude='__pycache__' .
+          # Exclude the artifact being created to prevent "file changed as we read it" error
+          tar -czf deployment.tar.gz \
+            --exclude='.git' \
+            --exclude='*.pyc' \
+            --exclude='__pycache__' \
+            --exclude='deployment.tar.gz' \
+            --exclude='.github/workflows-disabled' \
+            --exclude='.github/workflows-backup' \
+            --warning=no-file-changed \
+            . || true
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
