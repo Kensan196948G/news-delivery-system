@@ -54,11 +54,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install safety bandit flake8 black mypy
-        pip install -r requirements-minimal.txt || echo "Requirements installation check"
+        if [ -f requirements-minimal.txt ]; then
+          pip install -r requirements-minimal.txt || echo "Some packages may have failed to install"
+        fi
         
     - name: Comprehensive Problem Detection
       id: detect
       run: |
+        set -euo pipefail  # エラー時に即座に終了、未定義変数の使用を防ぐ
         echo "=== 🔍 自動検知フェーズ (1時間以内保証) ===" 
         echo "📅 検知時刻: $(date '+%Y-%m-%d %H:%M:%S JST')"
         
@@ -141,7 +144,7 @@ jobs:
   # 📝 Phase 2: Issue自動作成
   auto-issue-creation:
     needs: auto-detection
-    if: needs.auto-detection.outputs.problems_detected == 'true'
+    if: needs.auto-detection.outputs.problems_detected == 'true' || needs.auto-detection.outputs.problems_detected == true
     runs-on: ubuntu-latest
     outputs:
       issue_number: ${{ steps.create-issue.outputs.issue_number }}
@@ -191,7 +194,7 @@ jobs:
   # 🔧 Phase 3: 自動修復実行
   auto-repair:
     needs: [auto-detection, auto-issue-creation]
-    if: needs.auto-detection.outputs.problems_detected == 'true'
+    if: needs.auto-detection.outputs.problems_detected == 'true' || needs.auto-detection.outputs.problems_detected == true
     runs-on: ubuntu-latest
     outputs:
       repair_successful: ${{ steps.repair.outputs.repair_successful }}
@@ -215,6 +218,7 @@ jobs:
     - name: Execute Auto-Repair
       id: repair
       run: |
+        set -euo pipefail  # エラー時に即座に終了、未定義変数の使用を防ぐ
         echo "=== 🔧 自動修復フェーズ ===" 
         echo "📅 修復開始: $(date '+%Y-%m-%d %H:%M:%S JST')"
         
@@ -300,7 +304,7 @@ jobs:
   # 📋 Phase 4: PR自動作成
   auto-pr-creation:
     needs: [auto-detection, auto-issue-creation, auto-repair]
-    if: needs.auto-repair.outputs.repair_successful == 'true'
+    if: needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true
     runs-on: ubuntu-latest
     outputs:
       pr_number: ${{ steps.create-pr.outputs.pr_number }}
@@ -314,7 +318,19 @@ jobs:
     - name: Push repair branch
       run: |
         git fetch origin
-        git checkout auto-repair-flow/*
+        # Use the repair branch created in previous job
+        if [ -n "${{ env.REPAIR_BRANCH }}" ]; then
+          git checkout "${{ env.REPAIR_BRANCH }}"
+        else
+          # Fallback: find the latest auto-repair branch
+          LATEST_BRANCH=$(git branch -r | grep 'origin/auto-repair-flow' | sort -r | head -1 | sed 's/.*origin\///')
+          if [ -n "$LATEST_BRANCH" ]; then
+            git checkout "$LATEST_BRANCH"
+          else
+            echo "Error: No repair branch found"
+            exit 1
+          fi
+        fi
         git push origin HEAD
         
     - name: Create Auto-Repair PR
@@ -382,7 +398,7 @@ jobs:
   # 📧 Phase 5: 成功メール通知
   success-notification:
     needs: [auto-detection, auto-issue-creation, auto-repair, auto-pr-creation]
-    if: always() && needs.auto-repair.outputs.repair_successful == 'true'
+    if: always() && (needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true)
     runs-on: ubuntu-latest
     
     steps:
@@ -435,7 +451,7 @@ jobs:
   # 🔄 Phase 6: Issue自動クローズ
   auto-issue-close:
     needs: [auto-detection, auto-issue-creation, auto-repair, auto-pr-creation, success-notification]
-    if: always() && needs.auto-repair.outputs.repair_successful == 'true'
+    if: always() && (needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true)
     runs-on: ubuntu-latest
     
     steps:
