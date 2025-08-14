@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: $\{\{{ secrets.GITHUB_TOKEN \}\}}
         
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -80,7 +80,7 @@ jobs:
       id: create-pr
       uses: peter-evans/create-pull-request@v5
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: $\{\{{ secrets.GITHUB_TOKEN \}\}}
         commit-message: |
           chore: update dependencies
           
@@ -123,7 +123,7 @@ jobs:
     - name: Enable auto-merge for dependency updates
       if: steps.create-pr.outputs.pull-request-number != ''
       run: |
-        echo "Pull request created: ${{ steps.create-pr.outputs.pull-request-number }}"
+        echo "Pull request created: $\{\{{ steps.create-pr.outputs.pull-request-number \}\}}"
         echo "Auto-merge will be enabled if all checks pass"
         
         # Note: Auto-merge requires additional repository permissions

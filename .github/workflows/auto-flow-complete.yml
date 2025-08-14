@@ -35,10 +35,10 @@ jobs:
   auto-detection:
     runs-on: ubuntu-latest
     outputs:
-      problems_detected: ${{ steps.detect.outputs.problems_detected }}
-      issue_created: ${{ steps.detect.outputs.issue_created }}
-      issue_number: ${{ steps.detect.outputs.issue_number }}
-      detection_summary: ${{ steps.detect.outputs.detection_summary }}
+      problems_detected: $\{\{{ steps.detect.outputs.problems_detected \}\}}
+      issue_created: $\{\{{ steps.detect.outputs.issue_created \}\}}
+      issue_number: $\{\{{ steps.detect.outputs.issue_number \}\}}
+      detection_summary: $\{\{{ steps.detect.outputs.detection_summary \}\}}
     
     steps:
     - uses: actions/checkout@v4
@@ -100,7 +100,7 @@ jobs:
         echo "⚙️ システム整合性検査中..."
         critical_files=("requirements.txt" ".github/workflows/ci-cd.yml" "README.md")
         missing_files=0
-        for file in "${critical_files[@]}"; do
+        for file in "$\{\{critical_files[@]\}\}"; do
           if [ ! -f "$file" ]; then
             missing_files=$((missing_files + 1))
             DETECTION_RESULTS+=("📁 不足ファイル: $file")
@@ -113,14 +113,14 @@ jobs:
         fi
         
         # 検知結果サマリー
-        DETECTION_SUMMARY="検知時刻: $(date '+%H:%M JST'), 問題数: ${#DETECTION_RESULTS[@]}, 重要度: $SEVERITY_LEVEL"
+        DETECTION_SUMMARY="検知時刻: $(date '+%H:%M JST'), 問題数: $\{\{#DETECTION_RESULTS[@]\}\}, 重要度: $SEVERITY_LEVEL"
         
         echo "problems_detected=$PROBLEMS_DETECTED" >> $GITHUB_OUTPUT
         echo "detection_summary=$DETECTION_SUMMARY" >> $GITHUB_OUTPUT
         
         echo "📊 検知結果:"
         echo "- 問題検出: $PROBLEMS_DETECTED"
-        echo "- 検出項目: ${DETECTION_RESULTS[*]}"
+        echo "- 検出項目: $\{\{DETECTION_RESULTS[*]\}\}"
         echo "- 重要度: $SEVERITY_LEVEL"
         
         # 検知結果をファイルに保存
@@ -132,7 +132,7 @@ jobs:
           echo "重要度レベル: $SEVERITY_LEVEL"
           echo ""
           echo "検出内容:"
-          printf '%s\n' "${DETECTION_RESULTS[@]}"
+          printf '%s\n' "$\{\{DETECTION_RESULTS[@]\}\}"
           echo ""
           echo "システム状態:"
           echo "- セキュリティ: $([ "$PROBLEMS_DETECTED" = "true" ] && echo "要注意" || echo "正常")"
@@ -147,7 +147,7 @@ jobs:
     if: needs.auto-detection.outputs.problems_detected == 'true' || needs.auto-detection.outputs.problems_detected == true
     runs-on: ubuntu-latest
     outputs:
-      issue_number: ${{ steps.create-issue.outputs.issue_number }}
+      issue_number: $\{\{{ steps.create-issue.outputs.issue_number \}\}}
     
     steps:
     - name: Create Auto-Detection Issue
@@ -159,7 +159,7 @@ jobs:
           const issueBody = '## 🚨 自動検知システム - 問題発見\\n\\n' +
             '**検知時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
             '**検知方式**: 1時間以内自動監視\\n' +
-            '**検知結果**: ${{ needs.auto-detection.outputs.detection_summary }}\\n\\n' +
+            '**検知結果**: $\{\{{ needs.auto-detection.outputs.detection_summary \}\}}\\n\\n' +
             '### 🔍 検知内容\\n\\n' +
             '自動監視システムがシステム問題を検知しました。\\n\\n' +
             '### 🔄 自動対応フロー進行中\\n\\n' +
@@ -170,313 +170,21 @@ jobs:
             '⏳ 4. 📋 PR自動作成\\n' +
             '⏳ 5. 📧 成功メール通知\\n' +
             '⏳ 6. 🔄 Issue自動クローズ\\n' +
-            '```\\n\\n' +
-            '### 📊 進捗追跡\\n\\n' +
-            'このIssueは自動フローの進捗を追跡します：\\n' +
-            '- 自動修復完了時に更新されます\\n' +
-            '- PR作成時にリンクされます\\n' +
-            '- 成功時に自動クローズされます\\n\\n' +
-            '---\\n\\n' +
-            '**🤖 自動生成**: Complete Auto Flow System\\n' +
-            '**⏰ 推定完了時間**: 5-10分以内';
-          
-          const issue = await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: issueTitle,
-            body: issueBody,
-            labels: ['auto-detection', 'in-progress', 'automated-flow']
-          });
-          
-          console.log('✅ Issue自動作成完了: #' + issue.data.number);
-          return issue.data.number;
-
-  # 🔧 Phase 3: 自動修復実行
-  auto-repair:
-    needs: [auto-detection, auto-issue-creation]
-    if: needs.auto-detection.outputs.problems_detected == 'true' || needs.auto-detection.outputs.problems_detected == true
-    runs-on: ubuntu-latest
-    outputs:
-      repair_successful: ${{ steps.repair.outputs.repair_successful }}
-      repair_summary: ${{ steps.repair.outputs.repair_summary }}
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        
-    - name: Install repair tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install black isort flake8 safety pip-tools
-        
-    - name: Execute Auto-Repair
-      id: repair
-      run: |
-        set -euo pipefail  # エラー時に即座に終了、未定義変数の使用を防ぐ
-        echo "=== 🔧 自動修復フェーズ ===" 
-        echo "📅 修復開始: $(date '+%Y-%m-%d %H:%M:%S JST')"
-        
-        REPAIR_SUCCESSFUL=false
-        REPAIR_ACTIONS=()
-        
-        # Git設定
-        git config --global user.name "Auto-Repair Flow"
-        git config --global user.email "auto-repair@news-delivery-system.local"
-        
-        # 修復ブランチ作成
-        REPAIR_BRANCH="auto-repair-flow/$(date +%Y%m%d-%H%M%S)"
-        git checkout -b "$REPAIR_BRANCH"
-        echo "REPAIR_BRANCH=$REPAIR_BRANCH" >> $GITHUB_ENV
-        
-        # 1. コード品質自動修復
-        if [ -d "src/" ]; then
-          echo "📝 コード品質修復実行中..."
-          black src/ --line-length=88 || echo "Black formatting applied"
-          isort src/ || echo "Import sorting applied"
-          REPAIR_ACTIONS+=("コード品質修復")
-        fi
-        
-        # 2. セキュリティ問題軽減
-        if [ -f "test-vulnerability.py" ]; then
-          echo "🛡️ テスト脆弱性ファイル削除"
-          rm -f test-vulnerability.py
-          REPAIR_ACTIONS+=("セキュリティクリーンアップ")
-        fi
-        
-        # 3. 依存関係修復
-        if [ -f "requirements.txt" ]; then
-          echo "📦 依存関係最適化中..."
-          # 基本的な依存関係クリーンアップ
-          pip install pip-tools
-          pip-compile requirements.txt --quiet > requirements-optimized.txt 2>/dev/null || echo "Optimization attempted"
-          
-          if [ -f "requirements-optimized.txt" ] && [ -s "requirements-optimized.txt" ]; then
-            mv requirements-optimized.txt requirements.txt
-            REPAIR_ACTIONS+=("依存関係最適化")
-          fi
-        fi
-        
-        # 4. 設定ファイル修復
-        if [ ! -f ".gitignore" ]; then
-          echo "📁 .gitignore復元中..."
-          {
-            echo "__pycache__/"
-            echo "*.pyc"
-            echo "*.pyo"
-            echo ".env"
-            echo ".pytest_cache/"
-            echo ".coverage"
-            echo "htmlcov/"
-            echo "dist/"
-            echo "build/"
-            echo "*.egg-info/"
-            echo ".DS_Store"
-          } > .gitignore
-          REPAIR_ACTIONS+=("設定ファイル復元")
-        fi
-        
-        # 修復結果確認
-        if [ ${#REPAIR_ACTIONS[@]} -gt 0 ]; then
-          git add -A
-          git commit -m "🤖 自動修復: $(IFS=,; echo "${REPAIR_ACTIONS[*]}") | 修復時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | Issue: #${{ needs.auto-issue-creation.outputs.issue_number }} | 🤖 Generated with Claude Code"
-
-          REPAIR_SUCCESSFUL=true
-          echo "✅ 自動修復完了"
-        else
-          echo "ℹ️ 修復対象なし"
-        fi
-        
-        REPAIR_SUMMARY="修復時刻: $(date '+%H:%M JST'), 修復項目: ${#REPAIR_ACTIONS[@]}件, 成功: $REPAIR_SUCCESSFUL"
-        
-        echo "repair_successful=$REPAIR_SUCCESSFUL" >> $GITHUB_OUTPUT
-        echo "repair_summary=$REPAIR_SUMMARY" >> $GITHUB_OUTPUT
-        
-        echo "📊 修復結果:"
-        echo "- 修復成功: $REPAIR_SUCCESSFUL"
-        echo "- 修復項目: ${REPAIR_ACTIONS[*]}"
-
-  # 📋 Phase 4: PR自動作成
-  auto-pr-creation:
-    needs: [auto-detection, auto-issue-creation, auto-repair]
-    if: needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true
-    runs-on: ubuntu-latest
-    outputs:
-      pr_number: ${{ steps.create-pr.outputs.pr_number }}
-      pr_url: ${{ steps.create-pr.outputs.pr_url }}
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Push repair branch
-      run: |
-        git fetch origin
-        # Use the repair branch created in previous job
-        if [ -n "${{ env.REPAIR_BRANCH }}" ]; then
-          git checkout "${{ env.REPAIR_BRANCH }}"
-        else
-          # Fallback: find the latest auto-repair branch
-          LATEST_BRANCH=$(git branch -r | grep 'origin/auto-repair-flow' | sort -r | head -1 | sed 's/.*origin\///')
-          if [ -n "$LATEST_BRANCH" ]; then
-            git checkout "$LATEST_BRANCH"
-          else
-            echo "Error: No repair branch found"
-            exit 1
-          fi
-        fi
-        git push origin HEAD
-        
-    - name: Create Auto-Repair PR
-      id: create-pr
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const branchName = 'auto-repair-flow/' + new Date().toISOString().slice(0,19).replace(/[:-]/g, '');
-          
-          const pr = await github.rest.pulls.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: '🔧 自動修復: システム問題解決 (Issue #${{ needs.auto-issue-creation.outputs.issue_number }})',
-            head: branchName,
-            base: 'main',
-            body: '## 🔧 自動修復完了レポート\\n\\n' +
-              '**修復時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
-              '**関連Issue**: #${{ needs.auto-issue-creation.outputs.issue_number }}\\n' +
-              '**修復結果**: ${{ needs.auto-repair.outputs.repair_summary }}\\n\\n' +
-              '### 🔄 自動フロー進行状況\\n\\n' +
-              '```\\n' +
+            '``'\\n\\n' +\n            '### 📊 進捗追跡\\n\\n' +\n            'このIssueは自動フローの進捗を追跡します：\\n' +\n            '- 自動修復完了時に更新されます\\n' +\n            '- PR作成時にリンクされます\\n' +\n            '- 成功時に自動クローズされます\\n\\n' +\n            '---\\n\\n' +\n            '**🤖 自動生成**: Complete Auto Flow System\\n' +\n            '**⏰ 推定完了時間**: 5-10分以内';\n          \n          const issue = await github.rest.issues.create({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            title: issueTitle,\n            body: issueBody,\n            labels: ['auto-detection', 'in-progress', 'automated-flow']\n          });\n          \n          console.log('✅ Issue自動作成完了: #' + issue.data.number);\n          return issue.data.number;\n\n  # 🔧 Phase 3: 自動修復実行\n  auto-repair:\n    needs: [auto-detection, auto-issue-creation]\n    if: needs.auto-detection.outputs.problems_detected == 'true' || needs.auto-detection.outputs.problems_detected == true\n    runs-on: ubuntu-latest\n    outputs:\n      repair_successful: ' + { steps.repair.outputs.repair_successful  + '}\n      repair_summary: ' + { steps.repair.outputs.repair_summary  + '}\n    \n    steps:\n    - uses: actions/checkout@v4\n      with:\n        token: ' + { secrets.GITHUB_TOKEN  + '}\n        \n    - name: Set up Python\n      uses: actions/setup-python@v5\n      with:\n        python-version: '3.12'\n        \n    - name: Install repair tools\n      run: |\n        python -m pip install --upgrade pip\n        pip install black isort flake8 safety pip-tools\n        \n    - name: Execute Auto-Repair\n      id: repair\n      run: |\n        set -euo pipefail  # エラー時に即座に終了、未定義変数の使用を防ぐ\n        echo "=== 🔧 自動修復フェーズ ===" \n        echo "📅 修復開始: $(date '+%Y-%m-%d %H:%M:%S JST')"\n        \n        REPAIR_SUCCESSFUL=false\n        REPAIR_ACTIONS=()\n        \n        # Git設定\n        git config --global user.name "Auto-Repair Flow"\n        git config --global user.email "auto-repair@news-delivery-system.local"\n        \n        # 修復ブランチ作成\n        REPAIR_BRANCH="auto-repair-flow/$(date +%Y%m%d-%H%M%S)"\n        git checkout -b "$REPAIR_BRANCH"\n        echo "REPAIR_BRANCH=$REPAIR_BRANCH" >> $GITHUB_ENV\n        \n        # 1. コード品質自動修復\n        if [ -d "src/" ]; then\n          echo "📝 コード品質修復実行中..."\n          black src/ --line-length=88 || echo "Black formatting applied"\n          isort src/ || echo "Import sorting applied"\n          REPAIR_ACTIONS+=("コード品質修復")\n        fi\n        \n        # 2. セキュリティ問題軽減\n        if [ -f "test-vulnerability.py" ]; then\n          echo "🛡️ テスト脆弱性ファイル削除"\n          rm -f test-vulnerability.py\n          REPAIR_ACTIONS+=("セキュリティクリーンアップ")\n        fi\n        \n        # 3. 依存関係修復\n        if [ -f "requirements.txt" ]; then\n          echo "📦 依存関係最適化中..."\n          # 基本的な依存関係クリーンアップ\n          pip install pip-tools\n          pip-compile requirements.txt --quiet > requirements-optimized.txt 2>/dev/null || echo "Optimization attempted"\n          \n          if [ -f "requirements-optimized.txt" ] && [ -s "requirements-optimized.txt" ]; then\n            mv requirements-optimized.txt requirements.txt\n            REPAIR_ACTIONS+=("依存関係最適化")\n          fi\n        fi\n        \n        # 4. 設定ファイル修復\n        if [ ! -f ".gitignore" ]; then\n          echo "📁 .gitignore復元中..."\n          {\n            echo "__pycache__/"\n            echo "*.pyc"\n            echo "*.pyo"\n            echo ".env"\n            echo ".pytest_cache/"\n            echo ".coverage"\n            echo "htmlcov/"\n            echo "dist/"\n            echo "build/"\n            echo "*.egg-info/"\n            echo ".DS_Store"\n          } > .gitignore\n          REPAIR_ACTIONS+=("設定ファイル復元")\n        fi\n        \n        # 修復結果確認\n        if [ ' + #REPAIR_ACTIONS[@] + ' -gt 0 ]; then\n          git add -A\n          git commit -m "🤖 自動修復: $(IFS=,; echo "' + REPAIR_ACTIONS[*] + '") | 修復時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | Issue: #' + { needs.auto-issue-creation.outputs.issue_number  + '} | 🤖 Generated with Claude Code"\n\n          REPAIR_SUCCESSFUL=true\n          echo "✅ 自動修復完了"\n        else\n          echo "ℹ️ 修復対象なし"\n        fi\n        \n        REPAIR_SUMMARY="修復時刻: $(date '+%H:%M JST'), 修復項目: ' + #REPAIR_ACTIONS[@] + '件, 成功: $REPAIR_SUCCESSFUL"\n        \n        echo "repair_successful=$REPAIR_SUCCESSFUL" >> $GITHUB_OUTPUT\n        echo "repair_summary=$REPAIR_SUMMARY" >> $GITHUB_OUTPUT\n        \n        echo "📊 修復結果:"\n        echo "- 修復成功: $REPAIR_SUCCESSFUL"\n        echo "- 修復項目: ' + REPAIR_ACTIONS[*] + '"\n\n  # 📋 Phase 4: PR自動作成\n  auto-pr-creation:\n    needs: [auto-detection, auto-issue-creation, auto-repair]\n    if: needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true\n    runs-on: ubuntu-latest\n    outputs:\n      pr_number: ' + { steps.create-pr.outputs.pr_number  + '}\n      pr_url: ' + { steps.create-pr.outputs.pr_url  + '}\n    \n    steps:\n    - uses: actions/checkout@v4\n      with:\n        fetch-depth: 0\n        \n    - name: Push repair branch\n      run: |\n        git fetch origin\n        # Use the repair branch created in previous job\n        if [ -n "' + { env.REPAIR_BRANCH  + '}" ]; then\n          git checkout "' + { env.REPAIR_BRANCH  + '}"\n        else\n          # Fallback: find the latest auto-repair branch\n          LATEST_BRANCH=$(git branch -r | grep 'origin/auto-repair-flow' | sort -r | head -1 | sed 's/.*origin\///')\n          if [ -n "$LATEST_BRANCH" ]; then\n            git checkout "$LATEST_BRANCH"\n          else\n            echo "Error: No repair branch found"\n            exit 1\n          fi\n        fi\n        git push origin HEAD\n        \n    - name: Create Auto-Repair PR\n      id: create-pr\n      uses: actions/github-script@v7\n      with:\n        script: |\n          const branchName = 'auto-repair-flow/' + new Date().toISOString().slice(0,19).replace(/[:-]/g, '');\n          \n          const pr = await github.rest.pulls.create({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            title: '🔧 自動修復: システム問題解決 (Issue #' + { needs.auto-issue-creation.outputs.issue_number  + '})',\n            head: branchName,\n            base: 'main',\n            body: '## 🔧 自動修復完了レポート\\n\\n' +\n              '**修復時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +\n              '**関連Issue**: #' + { needs.auto-issue-creation.outputs.issue_number  + '}\\n' +\n              '**修復結果**: ' + { needs.auto-repair.outputs.repair_summary  + '}\\n\\n' +\n              '### 🔄 自動フロー進行状況\\n\\n' +\n              ''``\\n' +
               '✅ 1. 🔍 自動検知 (1時間以内)\\n' +
               '✅ 2. 📝 Issue自動作成\\n' +
               '✅ 3. 🔧 自動修復実行\\n' +
               '✅ 4. 📋 PR自動作成          ← 完了\\n' +
               '⏳ 5. 📧 成功メール通知\\n' +
               '⏳ 6. 🔄 Issue自動クローズ\\n' +
-              '```\\n\\n' +
-              '### 🎯 修復内容\\n\\n' +
-              'この自動修復により以下の問題が解決されました：\\n\\n' +
-              '- ✅ **検知された問題の自動解決**\\n' +
-              '- ✅ **コード品質の向上**\\n' +
-              '- ✅ **セキュリティ問題の軽減**\\n' +
-              '- ✅ **システム整合性の復旧**\\n\\n' +
-              '### 📊 品質保証\\n\\n' +
-              '- **自動テスト**: 修復後の品質チェック実行予定\\n' +
-              '- **セキュリティ**: 脆弱性スキャン通過\\n' +
-              '- **コード品質**: フォーマット・リント適用済み\\n\\n' +
-              '### ⚡ 次のステップ\\n\\n' +
-              '1. **自動マージ**: 品質チェック通過後\\n' +
-              '2. **成功通知**: メール配信実行\\n' +
-              '3. **Issue完了**: 自動クローズ\\n\\n' +
-              '---\\n\\n' +
-              '**🤖 完全自動生成**: Complete Auto Flow System\\n' +
-              '**Closes #${{ needs.auto-issue-creation.outputs.issue_number }}**',
-            draft: false
-          });
-          
-          // PR自動ラベル付け
-          await github.rest.issues.addLabels({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: pr.data.number,
-            labels: ['auto-repair', 'automated-flow', 'ready-for-merge']
-          });
-          
-          console.log('✅ PR自動作成完了: #' + pr.data.number);
-          console.log('🔗 PR URL: ' + pr.data.html_url);
-          
-          core.setOutput('pr_number', pr.data.number);
-          core.setOutput('pr_url', pr.data.html_url);
-          
-          return pr.data.number;
-
-  # 📧 Phase 5: 成功メール通知
-  success-notification:
-    needs: [auto-detection, auto-issue-creation, auto-repair, auto-pr-creation]
-    if: always() && (needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true)
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Send Success Email Notification
-      uses: actions/github-script@v7
-      with:
-        script: |
-          console.log('📧 成功メール通知準備中...');
-          
-          const emailContent = '件名: ✅ 自動修復成功通知 - ニュース配信システム\\n\\n' +
-            '自動修復フローが正常に完了しました。\\n\\n' +
-            '🔄 完了した自動フロー:\\n' +
-            '✅ 1. 🔍 自動検知 (1時間以内) - ' + new Date().toLocaleString('ja-JP') + '\\n' +
-            '✅ 2. 📝 Issue自動作成 - Issue #${{ needs.auto-issue-creation.outputs.issue_number }}\\n' +
-            '✅ 3. 🔧 自動修復実行 - ${{ needs.auto-repair.outputs.repair_summary }}\\n' +
-            '✅ 4. 📋 PR自動作成 - PR #${{ needs.auto-pr-creation.outputs.pr_number }}\\n' +
-            '✅ 5. 📧 成功メール通知 - 送信中\\n\\n' +
-            '📊 修復結果:\\n' +
-            '- 検知内容: ${{ needs.auto-detection.outputs.detection_summary }}\\n' +
-            '- 修復状況: 成功\\n' +
-            '- PR URL: ${{ needs.auto-pr-creation.outputs.pr_url }}\\n\\n' +
-            '⏰ 次回監視: 30分後に自動実行\\n\\n' +
-            '🤖 ニュース配信システム 自動運用';
-          
-          console.log('📧 メール内容準備完了');
-          console.log('📬 宛先: ${{ env.NOTIFICATION_EMAIL }}');
-          console.log('✅ 成功通知システム動作中');
-          
-          // Issue更新でメール送信完了を記録
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: ${{ needs.auto-issue-creation.outputs.issue_number }},
-            body: '📧 **成功メール通知送信完了**\\n\\n' +
-              '**送信時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
-              '**宛先**: ${{ env.NOTIFICATION_EMAIL }}\\n' +
-              '**内容**: 自動修復成功レポート\\n\\n' +
-              '🔄 **フロー進行状況**:\\n' +
-              '```\\n' +
+              '``'\\n\\n' +\n              '### 🎯 修復内容\\n\\n' +\n              'この自動修復により以下の問題が解決されました：\\n\\n' +\n              '- ✅ **検知された問題の自動解決**\\n' +\n              '- ✅ **コード品質の向上**\\n' +\n              '- ✅ **セキュリティ問題の軽減**\\n' +\n              '- ✅ **システム整合性の復旧**\\n\\n' +\n              '### 📊 品質保証\\n\\n' +\n              '- **自動テスト**: 修復後の品質チェック実行予定\\n' +\n              '- **セキュリティ**: 脆弱性スキャン通過\\n' +\n              '- **コード品質**: フォーマット・リント適用済み\\n\\n' +\n              '### ⚡ 次のステップ\\n\\n' +\n              '1. **自動マージ**: 品質チェック通過後\\n' +\n              '2. **成功通知**: メール配信実行\\n' +\n              '3. **Issue完了**: 自動クローズ\\n\\n' +\n              '---\\n\\n' +\n              '**🤖 完全自動生成**: Complete Auto Flow System\\n' +\n              '**Closes #' + { needs.auto-issue-creation.outputs.issue_number  + '}**',\n            draft: false\n          });\n          \n          // PR自動ラベル付け\n          await github.rest.issues.addLabels({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            issue_number: pr.data.number,\n            labels: ['auto-repair', 'automated-flow', 'ready-for-merge']\n          });\n          \n          console.log('✅ PR自動作成完了: #' + pr.data.number);\n          console.log('🔗 PR URL: ' + pr.data.html_url);\n          \n          core.setOutput('pr_number', pr.data.number);\n          core.setOutput('pr_url', pr.data.html_url);\n          \n          return pr.data.number;\n\n  # 📧 Phase 5: 成功メール通知\n  success-notification:\n    needs: [auto-detection, auto-issue-creation, auto-repair, auto-pr-creation]\n    if: always() && (needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true)\n    runs-on: ubuntu-latest\n    \n    steps:\n    - name: Send Success Email Notification\n      uses: actions/github-script@v7\n      with:\n        script: |\n          console.log('📧 成功メール通知準備中...');\n          \n          const emailContent = '件名: ✅ 自動修復成功通知 - ニュース配信システム\\n\\n' +\n            '自動修復フローが正常に完了しました。\\n\\n' +\n            '🔄 完了した自動フロー:\\n' +\n            '✅ 1. 🔍 自動検知 (1時間以内) - ' + new Date().toLocaleString('ja-JP') + '\\n' +\n            '✅ 2. 📝 Issue自動作成 - Issue #' + { needs.auto-issue-creation.outputs.issue_number  + '}\\n' +\n            '✅ 3. 🔧 自動修復実行 - ' + { needs.auto-repair.outputs.repair_summary  + '}\\n' +\n            '✅ 4. 📋 PR自動作成 - PR #' + { needs.auto-pr-creation.outputs.pr_number  + '}\\n' +\n            '✅ 5. 📧 成功メール通知 - 送信中\\n\\n' +\n            '📊 修復結果:\\n' +\n            '- 検知内容: ' + { needs.auto-detection.outputs.detection_summary  + '}\\n' +\n            '- 修復状況: 成功\\n' +\n            '- PR URL: ' + { needs.auto-pr-creation.outputs.pr_url  + '}\\n\\n' +\n            '⏰ 次回監視: 30分後に自動実行\\n\\n' +\n            '🤖 ニュース配信システム 自動運用';\n          \n          console.log('📧 メール内容準備完了');\n          console.log('📬 宛先: ' + { env.NOTIFICATION_EMAIL  + '}');\n          console.log('✅ 成功通知システム動作中');\n          \n          // Issue更新でメール送信完了を記録\n          await github.rest.issues.createComment({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            issue_number: ' + { needs.auto-issue-creation.outputs.issue_number  + '},\n            body: '📧 **成功メール通知送信完了**\\n\\n' +\n              '**送信時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +\n              '**宛先**: ' + { env.NOTIFICATION_EMAIL  + '}\\n' +\n              '**内容**: 自動修復成功レポート\\n\\n' +\n              '🔄 **フロー進行状況**:\\n' +\n              ''``\\n' +
               '✅ 1. 🔍 自動検知 (1時間以内)\\n' +
               '✅ 2. 📝 Issue自動作成\\n' +
               '✅ 3. 🔧 自動修復実行\\n' +
               '✅ 4. 📋 PR自動作成\\n' +
               '✅ 5. 📧 成功メール通知    ← 完了\\n' +
               '⏳ 6. 🔄 Issue自動クローズ\\n' +
-              '```\\n\\n' +
-              '🤖 **成功通知システム**'
-          });
-
-  # 🔄 Phase 6: Issue自動クローズ
-  auto-issue-close:
-    needs: [auto-detection, auto-issue-creation, auto-repair, auto-pr-creation, success-notification]
-    if: always() && (needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true)
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Complete Auto Flow - Close Issue
-      uses: actions/github-script@v7
-      with:
-        script: |
-          // 最終完了コメント
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: ${{ needs.auto-issue-creation.outputs.issue_number }},
-            body: '🎉 **自動フロー完了 - Issue自動クローズ**\\n\\n' +
-              '**完了時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
-              '**処理時間**: 約5-10分\\n' +
-              '**結果**: ✅ 全フェーズ成功\\n\\n' +
-              '### 🔄 完了した自動フロー\\n\\n' +
-              '```\\n' +
-              '✅ 1. 🔍 自動検知 (1時間以内)     - 問題発見・分析完了\\n' +
-              '✅ 2. 📝 Issue自動作成          - このIssue作成\\n' +
-              '✅ 3. 🔧 自動修復実行           - 問題解決実行\\n' +
-              '✅ 4. 📋 PR自動作成            - PR #${{ needs.auto-pr-creation.outputs.pr_number }}\\n' +
-              '✅ 5. 📧 成功メール通知         - 通知送信完了\\n' +
-              '✅ 6. 🔄 Issue自動クローズ      - 自動完了\\n' +
-              '```\\n\\n' +
+              '``'\\n\\n' +\n              '🤖 **成功通知システム**'\n          });\n\n  # 🔄 Phase 6: Issue自動クローズ\n  auto-issue-close:\n    needs: [auto-detection, auto-issue-creation, auto-repair, auto-pr-creation, success-notification]\n    if: always() && (needs.auto-repair.outputs.repair_successful == 'true' || needs.auto-repair.outputs.repair_successful == true)\n    runs-on: ubuntu-latest\n    \n    steps:\n    - name: Complete Auto Flow - Close Issue\n      uses: actions/github-script@v7\n      with:\n        script: |\n          // 最終完了コメント\n          await github.rest.issues.createComment({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            issue_number: ' + { needs.auto-issue-creation.outputs.issue_number  + '},\n            body: '🎉 **自動フロー完了 - Issue自動クローズ**\\n\\n' +\n              '**完了時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +\n              '**処理時間**: 約5-10分\\n' +\n              '**結果**: ✅ 全フェーズ成功\\n\\n' +\n              '### 🔄 完了した自動フロー\\n\\n' +\n              ''`'\\n' +\n              '✅ 1. 🔍 自動検知 (1時間以内)     - 問題発見・分析完了\\n' +\n              '✅ 2. 📝 Issue自動作成          - このIssue作成\\n' +\n              '✅ 3. 🔧 自動修復実行           - 問題解決実行\\n' +\n              '✅ 4. 📋 PR自動作成            - PR #' + { needs.auto-pr-creation.outputs.pr_number  + '}\\n' +\n              '✅ 5. 📧 成功メール通知         - 通知送信完了\\n' +\n              '✅ 6. 🔄 Issue自動クローズ      - 自動完了\\n' +\n              ''``\\n\\n' +
               '### 🎯 達成効果\\n\\n' +
               '- **⚡ 高速対応**: 1時間以内の検知→自動解決\\n' +
               '- **🤖 完全自動**: 人間の介入なしで問題解決\\n' +
@@ -491,7 +199,7 @@ jobs:
           await github.rest.issues.update({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: ${{ needs.auto-issue-creation.outputs.issue_number }},
+            issue_number: $\{\{{ needs.auto-issue-creation.outputs.issue_number \}\}},
             state: 'closed'
           });
           
@@ -511,10 +219,10 @@ jobs:
         echo "📅 実行完了時刻: $(date '+%Y-%m-%d %H:%M:%S JST')"
         echo ""
         echo "🔄 フロー実行結果:"
-        echo "1. 🔍 自動検知: ${{ needs.auto-detection.outputs.problems_detected }}"
-        echo "2. 📝 Issue作成: ${{ needs.auto-issue-creation.outputs.issue_number }}"
-        echo "3. 🔧 自動修復: ${{ needs.auto-repair.outputs.repair_successful }}"
-        echo "4. 📋 PR作成: ${{ needs.auto-pr-creation.outputs.pr_number }}"
+        echo "1. 🔍 自動検知: $\{\{{ needs.auto-detection.outputs.problems_detected \}\}}"
+        echo "2. 📝 Issue作成: $\{\{{ needs.auto-issue-creation.outputs.issue_number \}\}}"
+        echo "3. 🔧 自動修復: $\{\{{ needs.auto-repair.outputs.repair_successful \}\}}"
+        echo "4. 📋 PR作成: $\{\{{ needs.auto-pr-creation.outputs.pr_number \}\}}"
         echo "5. 📧 成功通知: 実行済み"
         echo "6. 🔄 Issue完了: 自動クローズ"
         echo ""

@@ -107,8 +107,8 @@ with open('bandit-report.json', 'r') as f:
           const fs = require('fs');
           
           let issueBody = '# 🚨 Security Alert - Automated Scan Results\n\n';
-          issueBody += `**Scan Date:** ${new Date().toISOString()}\n`;
-          issueBody += `**Triggered by:** ${context.eventName}\n\n`;
+          issueBody += '**Scan Date:** ' + new Date().toISOString() + '\n';
+          issueBody += '**Triggered by:** ' + context.eventName + '\n\n';
           
           // Safety report
           if (fs.existsSync('safety-report.json')) {
@@ -119,11 +119,11 @@ with open('bandit-report.json', 'r') as f:
               if (vulns.length > 0) {
                 issueBody += '## 🔍 Dependency Vulnerabilities (Safety)\n\n';
                 vulns.slice(0, 10).forEach(vuln => {
-                  issueBody += `### ${vuln.package_name} v${vuln.installed_version}\n`;
-                  issueBody += `- **Vulnerability ID:** ${vuln.vulnerability_id}\n`;
-                  issueBody += `- **Severity:** ${vuln.CVE || 'Unknown'}\n`;
-                  issueBody += `- **Description:** ${vuln.advisory}\n`;
-                  issueBody += `- **Recommended:** Update to v${vuln.closest_versions_without_known_vulnerabilities?.[0] || 'latest'}\n\n`;
+                  issueBody += '### ' + vuln.package_name + ' v' + vuln.installed_version + '\n';
+                  issueBody += '- **Vulnerability ID:** ' + vuln.vulnerability_id + '\n';
+                  issueBody += '- **Severity:** ' + vuln.CVE || 'Unknown' + '\n';
+                  issueBody += '- **Description:** ' + vuln.advisory + '\n';
+                  issueBody += '- **Recommended:** Update to v' + vuln.closest_versions_without_known_vulnerabilities?.[0] || 'latest' + '\n\n';
                 });
               }
             } catch (e) {
@@ -145,8 +145,8 @@ with open('bandit-report.json', 'r') as f:
                 if (highSeverity.length > 0) {
                   issueBody += '### HIGH Severity Issues\n';
                   highSeverity.slice(0, 5).forEach(issue => {
-                    issueBody += `- **${issue.test_name}** in \`${issue.filename}:${issue.line_number}\`\n`;
-                    issueBody += `  ${issue.issue_text}\n`;
+                    issueBody += '- **' + issue.test_name + '** in \'$\{\{issue.filename\}\}:$\{\{issue.line_number\}\}\`\n`;
+                    issueBody += '  ' + issue.issue_text + '\n';
                   });
                   issueBody += '\n';
                 }
@@ -154,8 +154,8 @@ with open('bandit-report.json', 'r') as f:
                 if (mediumSeverity.length > 0) {
                   issueBody += '### MEDIUM Severity Issues\n';
                   mediumSeverity.slice(0, 5).forEach(issue => {
-                    issueBody += `- **${issue.test_name}** in \`${issue.filename}:${issue.line_number}\`\n`;
-                    issueBody += `  ${issue.issue_text}\n`;
+                    issueBody += '- **' + issue.test_name + '** in \'$\{\{issue.filename\}\}:$\{\{issue.line_number\}\}\`\n`;
+                    issueBody += '  ' + issue.issue_text + '\n';
                   });
                   issueBody += '\n';
                 }
@@ -172,8 +172,8 @@ with open('bandit-report.json', 'r') as f:
               if (auditData.vulnerabilities && auditData.vulnerabilities.length > 0) {
                 issueBody += '## 📦 Package Audit Issues (pip-audit)\n\n';
                 auditData.vulnerabilities.slice(0, 5).forEach(vuln => {
-                  issueBody += `- **${vuln.package}** v${vuln.installed_version}\n`;
-                  issueBody += `  ID: ${vuln.id}, Fixed in: ${vuln.fixed_versions?.join(', ') || 'Unknown'}\n`;
+                  issueBody += '- **' + vuln.package + '** v' + vuln.installed_version + '\n';
+                  issueBody += '  ID: ' + vuln.id + ', Fixed in: ' + vuln.fixed_versions?.join(', ') || 'Unknown' + '\n';
                 });
               }
             } catch (e) {
@@ -260,20 +260,7 @@ with open('bandit-report.json', 'r') as f:
             owner: context.repo.owner,
             repo: context.repo.repo,
             title: '🔍 CodeQL Security Analysis - Issues Found',
-            body: `# CodeQL Security Analysis Results
-
-**Analysis Date:** ${new Date().toISOString()}
-
-CodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.
-
-## Next Steps
-1. Go to the **Security** tab in this repository
-2. Review **Code scanning alerts**
-3. Address any identified vulnerabilities
-4. Re-run the analysis to verify fixes
-
----
-🤖 This issue was automatically created by CodeQL analysis.`,
+            body: '# CodeQL Security Analysis Results\n\n**Analysis Date:** ' + new Date().toISOString() + '\n\nCodeQL has identified potential security issues in the codebase. Please review the Security tab for detailed findings.\n\n## Next Steps\n1. Go to the **Security** tab in this repository\n2. Review **Code scanning alerts**\n3. Address any identified vulnerabilities\n4. Re-run the analysis to verify fixes\n\n---\n🤖 This issue was automatically created by CodeQL analysis.',
             labels: ['security', 'codeql', 'automated']
           });
 

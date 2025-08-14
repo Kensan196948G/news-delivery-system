@@ -49,7 +49,7 @@ jobs:
           }
           
           if (validationErrors.length > 0) {
-            const comment = `## 🤖 PR Validation Results\n\n${validationErrors.join('\n')}\n\n### Conventional Commit Types:\n- **feat**: New feature\n- **fix**: Bug fix\n- **docs**: Documentation\n- **style**: Code style changes\n- **refactor**: Code refactoring\n- **test**: Adding tests\n- **chore**: Maintenance tasks\n- **ci**: CI/CD changes`;
+            const comment = '## 🤖 PR Validation Results\n\n' + validationErrors.join('\n') + '\n\n### Conventional Commit Types:\n- **feat**: New feature\n- **fix**: Bug fix\n- **docs**: Documentation\n- **style**: Code style changes\n- **refactor**: Code refactoring\n- **test**: Adding tests\n- **chore**: Maintenance tasks\n- **ci**: CI/CD changes';
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -251,7 +251,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.number,
-              commit_title: `Auto-merge: ${pr.title}`,
+              commit_title: 'Auto-merge: ' + pr.title + '',
               commit_message: 'Automatically merged dependabot PR for patch updates',
               merge_method: 'squash'
             });

@@ -31,9 +31,9 @@ jobs:
   error-detection:
     runs-on: ubuntu-latest
     outputs:
-      issues_found: ${{ steps.detect.outputs.issues_found }}
-      repair_needed: ${{ steps.detect.outputs.repair_needed }}
-      issue_types: ${{ steps.detect.outputs.issue_types }}
+      issues_found: $\{\{{ steps.detect.outputs.issues_found \}\}}
+      repair_needed: $\{\{{ steps.detect.outputs.repair_needed \}\}}
+      issue_types: $\{\{{ steps.detect.outputs.issue_types \}\}}
     
     steps:
     - uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
         # 4. 設定ファイル整合性検査
         echo "⚙️ 設定ファイル検査中..."
         critical_files=("requirements.txt" ".github/workflows/ci-cd.yml" "src/main.py")
-        for file in "${critical_files[@]}"; do
+        for file in "$\{\{critical_files[@]\}\}"; do
           if [ ! -f "$file" ]; then
             echo "❌ 重要ファイル不足: $file"
             ISSUES_FOUND=$((ISSUES_FOUND + 1))
@@ -123,12 +123,12 @@ jobs:
         # 結果出力
         echo "issues_found=$ISSUES_FOUND" >> $GITHUB_OUTPUT
         echo "repair_needed=$REPAIR_NEEDED" >> $GITHUB_OUTPUT
-        echo "issue_types=$(IFS=,; echo "${ISSUE_TYPES[*]}")" >> $GITHUB_OUTPUT
+        echo "issue_types=$(IFS=,; echo "$\{\{ISSUE_TYPES[*]\}\}")" >> $GITHUB_OUTPUT
         
         echo "📊 検出結果:"
         echo "- 検出問題数: $ISSUES_FOUND"
         echo "- 自動修復必要: $REPAIR_NEEDED"
-        echo "- 問題タイプ: ${ISSUE_TYPES[*]}"
+        echo "- 問題タイプ: $\{\{ISSUE_TYPES[*]\}\}"
 
   # 🔧 Phase 2: 自動修復
   auto-repair:
@@ -136,13 +136,13 @@ jobs:
     if: needs.error-detection.outputs.repair_needed == 'true'
     runs-on: ubuntu-latest
     outputs:
-      repair_successful: ${{ steps.repair.outputs.repair_successful }}
-      pr_needed: ${{ steps.repair.outputs.pr_needed }}
+      repair_successful: $\{\{{ steps.repair.outputs.repair_successful \}\}}
+      pr_needed: $\{\{{ steps.repair.outputs.pr_needed \}\}}
     
     steps:
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: $\{\{{ secrets.GITHUB_TOKEN \}\}}
         
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -173,7 +173,7 @@ jobs:
         git checkout -b "$REPAIR_BRANCH"
         
         # 1. 依存関係自動修復
-        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "dependency"; then
+        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "dependency"; then
           echo "📦 依存関係修復中..."
           
           # 競合解決
@@ -188,7 +188,7 @@ jobs:
         fi
         
         # 2. コード品質自動修復
-        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "quality"; then
+        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "quality"; then
           echo "📝 コード品質修復中..."
           
           # 自動フォーマット
@@ -201,7 +201,7 @@ jobs:
         fi
         
         # 3. セキュリティ問題自動修復（低リスクのみ）
-        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "security"; then
+        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "security"; then
           echo "🛡️ セキュリティ修復中..."
           
           # 安全な自動修復のみ実行
@@ -214,7 +214,7 @@ jobs:
         fi
         
         # 4. 不足ファイル自動復元
-        if echo "${{ needs.error-detection.outputs.issue_types }}" | grep -q "missing_file"; then
+        if echo "$\{\{{ needs.error-detection.outputs.issue_types \}\}}" | grep -q "missing_file"; then
           echo "📁 不足ファイル復元中..."
           
           # 基本的なファイル復元
@@ -243,9 +243,9 @@ jobs:
         fi
         
         # 変更コミット
-        if [ ${#CHANGES_MADE[@]} -gt 0 ]; then
+        if [ $\{\{#CHANGES_MADE[@]\}\} -gt 0 ]; then
           git add -A
-          git commit -m "🤖 自動修復: $(IFS=,; echo "${CHANGES_MADE[*]}") | 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | 修復タイプ: 完全自動化 | 🤖 Generated with Claude Code"
+          git commit -m "🤖 自動修復: $(IFS=,; echo "$\{\{CHANGES_MADE[*]\}\}") | 実行時刻: $(date '+%Y-%m-%d %H:%M:%S JST') | 修復タイプ: 完全自動化 | 🤖 Generated with Claude Code"
 
           REPAIR_SUCCESSFUL=true
           PR_NEEDED=true
@@ -261,7 +261,7 @@ jobs:
         echo "📊 修復結果:"
         echo "- 修復成功: $REPAIR_SUCCESSFUL"
         echo "- PR作成必要: $PR_NEEDED"
-        echo "- 変更内容: ${CHANGES_MADE[*]}"
+        echo "- 変更内容: $\{\{CHANGES_MADE[*]\}\}"
 
   # 📝 Phase 3: PR作成
   create-repair-pr:
@@ -269,7 +269,7 @@ jobs:
     if: needs.auto-repair.outputs.pr_needed == 'true'
     runs-on: ubuntu-latest
     outputs:
-      pr_number: ${{ steps.create-pr.outputs.pr_number }}
+      pr_number: $\{\{{ steps.create-pr.outputs.pr_number \}\}}
     
     steps:
     - uses: actions/checkout@v4
@@ -297,10 +297,10 @@ jobs:
             base: 'main',
             body: '## 🔧 自動修復レポート\\n\\n' +
               '**修復時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
-              '**検出問題**: ${{ needs.error-detection.outputs.issues_found }}件\\n' +
+              '**検出問題**: $\{\{{ needs.error-detection.outputs.issues_found \}\}}件\\n' +
               '**修復方法**: 完全自動化\\n\\n' +
               '### 🎯 修復内容\\n\\n' +
-              '${{ needs.error-detection.outputs.issue_types }}の問題を自動解決:\\n\\n' +
+              '$\{\{{ needs.error-detection.outputs.issue_types \}\}}の問題を自動解決:\\n\\n' +
               '- ✅ **依存関係修復**: 競合解決・バージョン最適化\\n' +
               '- ✅ **コード品質向上**: フォーマット・リント修正\\n' +
               '- ✅ **セキュリティ強化**: 低リスク問題自動修正\\n' +
@@ -308,50 +308,7 @@ jobs:
               '### 🔄 運用サイクル\\n\\n' +
               '```\\n' +
               'エラー検知(30分おき) → 自動修復 → [PR作成] → レビュー → マージ → デプロイ\\n' +
-              '```\\n\\n' +
-              '### ⚡ 品質向上効果\\n\\n' +
-              '- **修復速度**: 数分で完了\\n' +
-              '- **人的工数**: ゼロ（完全自動化）\\n' +
-              '- **品質維持**: 継続的な改善\\n' +
-              '- **24/7監視**: 人間の監視不要\\n\\n' +
-              '### 🧪 検証項目\\n\\n' +
-              '- [ ] 自動修復内容の確認\\n' +
-              '- [ ] テスト実行結果\\n' +
-              '- [ ] セキュリティスキャン通過\\n\\n' +
-              '---\\n\\n' +
-              '**🤖 完全自動生成**: Auto-Repair Cycle System',
-            draft: false
-          });
-          
-          // PR自動ラベル付け
-          await github.rest.issues.addLabels({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: pr.data.number,
-            labels: ['auto-repair', 'enhancement', 'auto-generated', 'ready-for-review']
-          });
-          
-          console.log('✅ 自動修復PR作成完了: #' + pr.data.number);
-          return pr.data.number;
-
-  # 📋 Phase 4: Issue自動作成 → 分析・応答
-  create-tracking-issue:
-    needs: [error-detection]
-    if: needs.error-detection.outputs.issues_found != '0'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Create Auto-Tracking Issue
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const issueTitle = '🔍 自動監視: システム問題追跡 (' + new Date().toLocaleDateString('ja-JP') + ')';
-          const issueBody = '## 📊 24/7継続監視レポート\\n\\n' +
-            '**検出時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +
-            '**検出問題数**: ${{ needs.error-detection.outputs.issues_found }}件\\n' +
-            '**問題タイプ**: ${{ needs.error-detection.outputs.issue_types }}\\n\\n' +
-            '### 🔄 自動運用サイクル進行状況\\n\\n' +
-            '```\\n' +
+              '``'\\n\\n' +\n              '### ⚡ 品質向上効果\\n\\n' +\n              '- **修復速度**: 数分で完了\\n' +\n              '- **人的工数**: ゼロ（完全自動化）\\n' +\n              '- **品質維持**: 継続的な改善\\n' +\n              '- **24/7監視**: 人間の監視不要\\n\\n' +\n              '### 🧪 検証項目\\n\\n' +\n              '- [ ] 自動修復内容の確認\\n' +\n              '- [ ] テスト実行結果\\n' +\n              '- [ ] セキュリティスキャン通過\\n\\n' +\n              '---\\n\\n' +\n              '**🤖 完全自動生成**: Auto-Repair Cycle System',\n            draft: false\n          });\n          \n          // PR自動ラベル付け\n          await github.rest.issues.addLabels({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            issue_number: pr.data.number,\n            labels: ['auto-repair', 'enhancement', 'auto-generated', 'ready-for-review']\n          });\n          \n          console.log('✅ 自動修復PR作成完了: #' + pr.data.number);\n          return pr.data.number;\n\n  # 📋 Phase 4: Issue自動作成 → 分析・応答\n  create-tracking-issue:\n    needs: [error-detection]\n    if: needs.error-detection.outputs.issues_found != '0'\n    runs-on: ubuntu-latest\n    \n    steps:\n    - name: Create Auto-Tracking Issue\n      uses: actions/github-script@v7\n      with:\n        script: |\n          const issueTitle = '🔍 自動監視: システム問題追跡 (' + new Date().toLocaleDateString('ja-JP') + ')';\n          const issueBody = '## 📊 24/7継続監視レポート\\n\\n' +\n            '**検出時刻**: ' + new Date().toLocaleString('ja-JP') + '\\n' +\n            '**検出問題数**: ' + { needs.error-detection.outputs.issues_found  + '}件\\n' +\n            '**問題タイプ**: ' + { needs.error-detection.outputs.issue_types  + '}\\n\\n' +\n            '### 🔄 自動運用サイクル進行状況\\n\\n' +\n            ''``\\n' +
             '✅ エラー検知(30分おき) → ✅ 自動修復 → ✅ PR作成 → ⏳ レビュー → ⏳ マージ → ⏳ デプロイ\\n' +
             '          ↓\\n' +
             '✅ Issue自動作成 → [分析・応答] → コマンド実行 → 解決 → 自動クローズ\\n' +
@@ -397,9 +354,9 @@ jobs:
       run: |
         echo "=== 🔄 自動運用サイクル完了レポート ===" 
         echo "📅 実行日時: $(date '+%Y-%m-%d %H:%M:%S JST')"
-        echo "🔍 検出問題: ${{ needs.error-detection.outputs.issues_found }}件"
-        echo "🔧 修復実行: ${{ needs.auto-repair.outputs.repair_successful }}"
-        echo "📝 PR作成: ${{ needs.auto-repair.outputs.pr_needed }}"
+        echo "🔍 検出問題: $\{\{{ needs.error-detection.outputs.issues_found \}\}}件"
+        echo "🔧 修復実行: $\{\{{ needs.auto-repair.outputs.repair_successful \}\}}"
+        echo "📝 PR作成: $\{\{{ needs.auto-repair.outputs.pr_needed \}\}}"
         echo ""
         echo "🎯 自動化効果:"
         echo "- ✅ 24/7継続監視: 人間の介入不要"

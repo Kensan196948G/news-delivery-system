@@ -32,8 +32,8 @@ jobs:
     timeout-minutes: 10
     
     outputs:
-      python_version: ${{ steps.versions.outputs.python_version }}
-      has_requirements: ${{ steps.check.outputs.has_requirements }}
+      python_version: $\{\{{ steps.versions.outputs.python_version \}\}}
+      has_requirements: $\{\{{ steps.check.outputs.has_requirements \}\}}
     
     steps:
     - name: Checkout code
@@ -47,8 +47,8 @@ jobs:
         # YAMLファイルの構文チェック
         for file in .github/workflows/*.yml; do
           echo "Checking $file..."
-          python3 -c "import yaml; yaml.safe_load(open('$file'))" || {
-            echo "❌ YAML syntax error in $file"
+          python3 -c "import yaml; yaml.safe_load(open('$file'))" || { echo "❌ YAML syntax error in $file"
+
             exit 1
           }
         done
@@ -57,7 +57,7 @@ jobs:
       id: check
       run: |
         # Pythonバージョン確認
-        PYTHON_VERSION="${{ env.PYTHON_VERSION }}"
+        PYTHON_VERSION="$\{\{{ env.PYTHON_VERSION \}\}}"
         echo "python_version=$PYTHON_VERSION" >> $GITHUB_OUTPUT
         
         # requirements.txtの存在確認
@@ -70,7 +70,7 @@ jobs:
     - name: Version outputs
       id: versions
       run: |
-        echo "python_version=${{ env.PYTHON_VERSION }}" >> $GITHUB_OUTPUT
+        echo "python_version=$\{\{{ env.PYTHON_VERSION \}\}}" >> $GITHUB_OUTPUT
 
   improved-python-setup:
     needs: setup-validation
@@ -83,7 +83,7 @@ jobs:
     - name: Set up Python with cache
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ needs.setup-validation.outputs.python_version }}
+        python-version: $\{\{{ needs.setup-validation.outputs.python_version \}\}}
         cache: 'pip'
         cache-dependency-path: |
           requirements*.txt
@@ -125,7 +125,7 @@ jobs:
         fi
         
         # 開発用依存関係（オプション）
-        if [ -f requirements-dev.txt ] && [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+        if [ -f requirements-dev.txt ] && [ "$\{\{{ github.event.inputs.test_mode \}\}}" = "true" ]; then
           echo "Installing dev requirements..."
           python -m pip install -r requirements-dev.txt || echo "Dev packages may have failed"
         fi
@@ -225,8 +225,8 @@ jobs:
           echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
           
           # 実行したいコマンド
-          if python -c "import random; exit(0 if random.random() > 0.5 else 1)"; then
-            echo "✅ Success!"
+          if python -c "import random; exit(0 if random.random() > 0.5 else 1)"; then echo "✅ Success!"
+
             break
           else
             echo "⚠️ Failed, retrying..."
@@ -270,49 +270,7 @@ jobs:
     steps:
     - name: Summary of improvements
       run: |
-        cat << 'EOF'
-        ========================================
-        ワークフロー改善のベストプラクティス
-        ========================================
-        
-        1. エラーハンドリング
-           - || true または || echo "message" を使用
-           - set -euo pipefail でエラー時の即座の終了
-           - continue-on-error: true で重要でないステップの失敗を許容
-        
-        2. タイムアウト設定
-           - ジョブレベル: timeout-minutes: 30
-           - ステップレベル: timeout-minutes: 5
-        
-        3. キャッシュの活用
-           - actions/setup-python@v5 with cache: 'pip'
-           - actions/cache@v4 for custom caching
-        
-        4. セキュリティ
-           - persist-credentials: false
-           - 最小限の権限設定
-           - シークレットの適切な使用
-        
-        5. 変数とシークレット
-           - ${{ secrets.GITHUB_TOKEN }} は自動提供
-           - カスタムシークレットは Settings > Secrets で設定
-           - 環境変数は env: セクションで定義
-        
-        6. 条件実行
-           - if: always() - 常に実行
-           - if: failure() - 失敗時のみ
-           - if: success() - 成功時のみ
-           - if: cancelled() - キャンセル時のみ
-        
-        7. 出力の管理
-           - echo "key=value" >> $GITHUB_OUTPUT
-           - steps.<step_id>.outputs.<output_name>
-        
-        8. デバッグ
-           - ACTIONS_RUNNER_DEBUG: true
-           - ACTIONS_STEP_DEBUG: true
-        
-        EOF
+        echo "========================================\n        ワークフロー改善のベストプラクティス\n        ========================================\n        \n        1. エラーハンドリング\n           - || true または || echo \"message\" を使用\n           - set -euo pipefail でエラー時の即座の終了\n           - continue-on-error: true で重要でないステップの失敗を許容\n        \n        2. タイムアウト設定\n           - ジョブレベル: timeout-minutes: 30\n           - ステップレベル: timeout-minutes: 5\n        \n        3. キャッシュの活用\n           - actions/setup-python@v5 with cache: 'pip'\n           - actions/cache@v4 for custom caching\n        \n        4. セキュリティ\n           - persist-credentials: false\n           - 最小限の権限設定\n           - シークレットの適切な使用\n        \n        5. 変数とシークレット\n           - $\{\{{ secrets.GITHUB_TOKEN \}\}} は自動提供\n           - カスタムシークレットは Settings > Secrets で設定\n           - 環境変数は env: セクションで定義\n        \n        6. 条件実行\n           - if: always() - 常に実行\n           - if: failure() - 失敗時のみ\n           - if: success() - 成功時のみ\n           - if: cancelled() - キャンセル時のみ\n        \n        7. 出力の管理\n           - echo \"key=value\" >> $GITHUB_OUTPUT\n           - steps.<step_id>.outputs.<output_name>\n        \n        8. デバッグ\n           - ACTIONS_RUNNER_DEBUG: true\n           - ACTIONS_STEP_DEBUG: true"
 
   notification:
     runs-on: ubuntu-latest
@@ -323,14 +281,14 @@ jobs:
     - name: Send notification
       run: |
         # ジョブの結果を集計
-        echo "Setup Validation: ${{ needs.setup-validation.result }}"
-        echo "Python Setup: ${{ needs.improved-python-setup.result }}"
-        echo "Security Checks: ${{ needs.security-checks.result }}"
-        echo "Command Escaping: ${{ needs.command-escaping-example.result }}"
-        echo "Error Recovery: ${{ needs.error-recovery-pattern.result }}"
+        echo "Setup Validation: $\{\{{ needs.setup-validation.result \}\}}"
+        echo "Python Setup: $\{\{{ needs.improved-python-setup.result \}\}}"
+        echo "Security Checks: $\{\{{ needs.security-checks.result \}\}}"
+        echo "Command Escaping: $\{\{{ needs.command-escaping-example.result \}\}}"
+        echo "Error Recovery: $\{\{{ needs.error-recovery-pattern.result \}\}}"
         
         # 全体の結果判定
-        if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+        if [ "$\{\{{ contains(needs.*.result, 'failure') \}\}}" = "true" ]; then
           echo "⚠️ Some jobs failed"
         else
           echo "✅ All jobs completed successfully"

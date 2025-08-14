@@ -110,16 +110,16 @@ else:
         )
         
         missing_sections=()
-        for section in "${required_sections[@]}"; do
+        for section in "$\{\{required_sections[@]\}\}"; do
           if ! grep -qi "## $section\|# $section" README.md; then
             missing_sections+=("$section")
           fi
         done
         
-        if [ ${#missing_sections[@]} -gt 0 ]; then
-          echo "Missing README sections: ${missing_sections[*]}"
+        if [ $\{\{#missing_sections[@]\}\} -gt 0 ]; then
+          echo "Missing README sections: $\{\{missing_sections[*]\}\}"
           echo "missing_readme_sections=true" >> $GITHUB_OUTPUT
-          echo "${missing_sections[*]}" > missing_readme_sections.txt
+          echo "$\{\{missing_sections[*]\}\}" > missing_readme_sections.txt
         else
           echo "README.md is complete!"
           echo "missing_readme_sections=false" >> $GITHUB_OUTPUT
@@ -190,208 +190,46 @@ else:
           const fs = require('fs');
           
           let issueBody = '# 📚 Documentation Improvement Needed\n\n';
-          issueBody += `**Analysis Date:** ${new Date().toISOString()}\n`;
-          issueBody += `**Triggered by:** ${context.eventName} on ${context.ref}\n\n`;
+          issueBody += '**Analysis Date:** ' + new Date().toISOString() + '\n';
+          issueBody += '**Triggered by:** ' + context.eventName + ' on ' + context.ref + '\n\n';
           
           // Missing docstrings
-          if ('${{ steps.doc_coverage.outputs.missing_docs }}' === 'true' && fs.existsSync('missing_docstrings.txt')) {
+          if ('$\{\{{ steps.doc_coverage.outputs.missing_docs \}\}}' === 'true' && fs.existsSync('missing_docstrings.txt')) {
             const missingDocs = fs.readFileSync('missing_docstrings.txt', 'utf8').trim().split('\n');
             issueBody += '## 📝 Missing Docstrings\n\n';
             issueBody += 'The following functions and classes are missing docstrings:\n\n';
             
             missingDocs.slice(0, 20).forEach(item => {
-              issueBody += `- \`${item}\`\n`;
+              issueBody += `- \'' + item + '\'\n`;
             });
             
             if (missingDocs.length > 20) {
-              issueBody += `\n... and ${missingDocs.length - 20} more\n`;
+              issueBody += '\n... and ' + missingDocs.length - 20 + ' more\n';
             }
             issueBody += '\n';
           }
           
           // Missing README sections
-          if ('${{ steps.readme_check.outputs.missing_readme_sections }}' === 'true' && fs.existsSync('missing_readme_sections.txt')) {
+          if ('$\{\{{ steps.readme_check.outputs.missing_readme_sections \}\}}' === 'true' && fs.existsSync('missing_readme_sections.txt')) {
             const missingSections = fs.readFileSync('missing_readme_sections.txt', 'utf8').trim().split(' ');
             issueBody += '## 📖 Missing README Sections\n\n';
             issueBody += 'Please add the following sections to README.md:\n\n';
             
             missingSections.forEach(section => {
-              issueBody += `- ## ${section}\n`;
+              issueBody += '- ## ' + section + '\n';
             });
             issueBody += '\n';
           }
           
           // Low comment density
-          if ('${{ steps.comments_check.outputs.needs_comments }}' === 'true' && fs.existsSync('low_comment_files.txt')) {
+          if ('$\{\{{ steps.comments_check.outputs.needs_comments \}\}}' === 'true' && fs.existsSync('low_comment_files.txt')) {
             const lowCommentFiles = fs.readFileSync('low_comment_files.txt', 'utf8').trim().split('\n');
             issueBody += '## 💬 Files Need More Comments\n\n';
             issueBody += 'The following files have low comment density:\n\n';
             
             lowCommentFiles.forEach(file => {
-              issueBody += `- \`${file}\`\n`;
-            });
-            issueBody += '\n';
-          }
-          
-          issueBody += '## ✅ Recommendations\n\n';
-          issueBody += '### For Docstrings:\n';
-          issueBody += '- Add docstrings to all public functions and classes\n';
-          issueBody += '- Use Google/NumPy docstring format\n';
-          issueBody += '- Include parameter types and return values\n\n';
-          
-          issueBody += '### For README:\n';
-          issueBody += '- Add missing sections with clear, helpful content\n';
-          issueBody += '- Include code examples where appropriate\n';
-          issueBody += '- Keep information up-to-date\n\n';
-          
-          issueBody += '### For Comments:\n';
-          issueBody += '- Add inline comments for complex logic\n';
-          issueBody += '- Explain why, not just what\n';
-          issueBody += '- Keep comments concise and relevant\n\n';
-          
-          issueBody += '---\n';
-          issueBody += '🤖 This issue was automatically created by documentation analysis.';
-          
-          // Check for existing documentation issues
-          const { data: existingIssues } = await github.rest.issues.listForRepo({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            labels: 'documentation',
-            state: 'open'
-          });
-          
-          const docIssues = existingIssues.filter(issue => 
-            issue.title.includes('Documentation Improvement') || issue.title.includes('📚')
-          );
-          
-          if (docIssues.length === 0) {
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '📚 Documentation Improvement Needed',
-              body: issueBody,
-              labels: ['documentation', 'enhancement', 'automated']
-            });
-          } else {
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: docIssues[0].number,
-              body: '🔄 **Updated Documentation Analysis**\n\n' + issueBody
-            });
-          }
+              issueBody += `- \'' + file + '\'\n';\n            });\n            issueBody += '\n';\n          }\n          \n          issueBody += '## ✅ Recommendations\n\n';\n          issueBody += '### For Docstrings:\n';\n          issueBody += '- Add docstrings to all public functions and classes\n';\n          issueBody += '- Use Google/NumPy docstring format\n';\n          issueBody += '- Include parameter types and return values\n\n';\n          \n          issueBody += '### For README:\n';\n          issueBody += '- Add missing sections with clear, helpful content\n';\n          issueBody += '- Include code examples where appropriate\n';\n          issueBody += '- Keep information up-to-date\n\n';\n          \n          issueBody += '### For Comments:\n';\n          issueBody += '- Add inline comments for complex logic\n';\n          issueBody += '- Explain why, not just what\n';\n          issueBody += '- Keep comments concise and relevant\n\n';\n          \n          issueBody += '---\n';\n          issueBody += '🤖 This issue was automatically created by documentation analysis.';\n          \n          // Check for existing documentation issues\n          const { data: existingIssues } = await github.rest.issues.listForRepo({\n            owner: context.repo.owner,\n            repo: context.repo.repo,\n            labels: 'documentation',\n            state: 'open'\n          });\n          \n          const docIssues = existingIssues.filter(issue => \n            issue.title.includes('Documentation Improvement') || issue.title.includes('📚')\n          );\n          \n          if (docIssues.length === 0) {\n            await github.rest.issues.create({\n              owner: context.repo.owner,\n              repo: context.repo.repo,\n              title: '📚 Documentation Improvement Needed',\n              body: issueBody,\n              labels: ['documentation', 'enhancement', 'automated']\n            });\n          } else {\n            await github.rest.issues.createComment({\n              owner: context.repo.owner,\n              repo: context.repo.repo,\n              issue_number: docIssues[0].number,\n              body: '🔄 **Updated Documentation Analysis**\n\n' + issueBody\n            });\n          }\n\n  auto-generate-docs:\n    runs-on: ubuntu-latest\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n    \n    steps:\n    - uses: actions/checkout@v4\n      with:\n        token: ' + { secrets.GITHUB_TOKEN  + '}\n        \n    - name: Set up Python\n      uses: actions/setup-python@v5\n      with:\n        python-version: '3.12'\n        \n    - name: Install dependencies\n      run: |\n        python -m pip install --upgrade pip\n        pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints || echo "Some packages may have failed"\n        \n        # Install minimal dependencies \n        if [ -f requirements-minimal.txt ]; then\n          pip install -r requirements-minimal.txt || echo "Some packages may have failed to install"\n        fi\n        \n    - name: Generate API Documentation\n      run: |\n        echo "Generating API documentation..."\n        \n        # Create docs directory if it doesn't exist\n        mkdir -p docs/api\n        \n        # Generate module documentation\n        python -c "\nimport os\nimport importlib.util\n\ndef generate_module_doc(module_path, module_name):\n    doc_content = f'''# {module_name.replace('_', ' ').title()} Module\n\n## Overview\n\nThis module contains the implementation for {module_name.replace('_', ' ')}.\n\n## Classes and Functions\n\n'''\n    \n    try:\n        spec = importlib.util.spec_from_file_location(module_name, module_path)\n        module = importlib.util.module_from_spec(spec)\n        spec.loader.exec_module(module)\n        \n        # Get all classes and functions\n        import inspect\n        \n        members = inspect.getmembers(module)\n        \n        for name, obj in members:\n            if not name.startswith('_'):\n                if inspect.isclass(obj):\n                    doc_content += f'### {name} (Class)\n\n'\n                    if obj.__doc__:\n                        doc_content += f'{obj.__doc__}\n\n'\n                    else:\n                        doc_content += 'No documentation available.\n\n'\n                        \n                elif inspect.isfunction(obj):\n                    doc_content += f'### {name}() (Function)\n\n'\n                    if obj.__doc__:\n                        doc_content += f'{obj.__doc__}\n\n'\n                    else:\n                        doc_content += 'No documentation available.\n\n'\n        \n    except Exception as e:\n        doc_content += f'Error loading module: {e}\n'\n    \n    return doc_content\n\n# Generate docs for main modules\nmodules = [\n    ('src/main.py', 'main'),\n    ('src/collectors/base_collector.py', 'base_collector'),\n    ('src/processors/translator.py', 'translator'),\n    ('src/notifiers/gmail_sender.py', 'gmail_sender'),\n]\n\nfor module_path, module_name in modules:\n    if os.path.exists(module_path):\n        doc_content = generate_module_doc(module_path, module_name)\n        \n        with open(f'docs/api/{module_name}.md', 'w') as f:\n            f.write(doc_content)\n        \n        print(f'Generated docs/api/{module_name}.md')\n"\n        \n    - name: Update Architecture Diagram\n      run: |\n        echo "Updating architecture documentation..."\n        \n        cat > docs/ARCHITECTURE.md << 'EOF'\n# System Architecture\n\n## Overview\n\nThe News Delivery System is designed as a modular, event-driven architecture that automatically collects, processes, and delivers news content.\n\n## Component Diagram\n\n'`` ┌─────────────────────────────────────────────────────────────┐; │                    News Delivery System                      │; ├─────────────────────────────────────────────────────────────┤; │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │; │  │  Collectors │  │ Processors  │  │ Generators  │         │; │  │             │  │             │  │             │         │; │  │ • NewsAPI   │  │ • Translator│  │ • HTML Gen  │         │; │  │ • GNews     │  │ • Analyzer  │  │ • PDF Gen   │         │; │  │ • NVD       │  │ • Dedup     │  │             │         │; │  └─────────────┘  └─────────────┘  └─────────────┘         │; │          │                │                │               │; │          └────────────────┼────────────────┘               │; │                          │                                 │; │  ┌─────────────┐        │        ┌─────────────┐         │; │  │  Database   │◄───────┼───────►│ Notifiers   │         │; │  │             │        │        │             │         │; │  │ • SQLite    │        │        │ • Gmail     │         │; │  │ • Cache     │        │        │ • SMTP      │         │; │  └─────────────┘        │        └─────────────┘         │; │                          │                                 │; │  ┌─────────────┐        │        ┌─────────────┐         │; │  │ Monitoring  │◄───────┼───────►│ Automation  │         │; │  │             │        │        │             │         │; │  │ • Logging   │        │        │ • Cron      │         │; │  │ • Alerts    │        │        │ • Backup    │         │; │  └─────────────┘        │        └─────────────┘         │; │                          │                                 │; │                    ┌─────▼─────┐                          │; │                    │   Main    │                          │; │                    │Controller │                          │; │                    └───────────┘                          │; └─────────────────────────────────────────────────────────────┘; ```; ; ## Data Flow; ; 1. **Collection Phase**: Multiple collectors gather news from various sources; 2. **Processing Phase**: Articles are translated, analyzed, and deduplicated; 3. **Generation Phase**: Reports are generated in HTML and PDF formats; 4. **Delivery Phase**: Reports are sent via email; 5. **Monitoring Phase**: System logs activities and sends alerts on errors; ; ## Security Considerations; ; - API keys stored securely in environment variables; - Email credentials managed through OAuth2; - All HTTP connections use TLS; - Input validation on all external data; - Regular security scans via GitHub Actions; ; ## Scalability; ; - Modular design allows easy addition of new collectors; - Asynchronous processing for better performance; - Database caching reduces API calls; - Configurable retry mechanisms for reliability; ; ## Deployment; ; - GitHub Actions for CI/CD; - Automated testing and quality gates; - Security scanning and dependency updates; - Multiple deployment environments supported; ; EOF; ; - name: Commit Generated Documentation; run: |; git config --local user.email "action@github.com"
 
-  auto-generate-docs:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints || echo "Some packages may have failed"
-        
-        # Install minimal dependencies 
-        if [ -f requirements-minimal.txt ]; then
-          pip install -r requirements-minimal.txt || echo "Some packages may have failed to install"
-        fi
-        
-    - name: Generate API Documentation
-      run: |
-        echo "Generating API documentation..."
-        
-        # Create docs directory if it doesn't exist
-        mkdir -p docs/api
-        
-        # Generate module documentation
-        python -c "
-import os
-import importlib.util
-
-def generate_module_doc(module_path, module_name):
-    doc_content = f'''# {module_name.replace('_', ' ').title()} Module
-
-## Overview
-
-This module contains the implementation for {module_name.replace('_', ' ')}.
-
-## Classes and Functions
-
-'''
-    
-    try:
-        spec = importlib.util.spec_from_file_location(module_name, module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        
-        # Get all classes and functions
-        import inspect
-        
-        members = inspect.getmembers(module)
-        
-        for name, obj in members:
-            if not name.startswith('_'):
-                if inspect.isclass(obj):
-                    doc_content += f'### {name} (Class)\n\n'
-                    if obj.__doc__:
-                        doc_content += f'{obj.__doc__}\n\n'
-                    else:
-                        doc_content += 'No documentation available.\n\n'
-                        
-                elif inspect.isfunction(obj):
-                    doc_content += f'### {name}() (Function)\n\n'
-                    if obj.__doc__:
-                        doc_content += f'{obj.__doc__}\n\n'
-                    else:
-                        doc_content += 'No documentation available.\n\n'
-        
-    except Exception as e:
-        doc_content += f'Error loading module: {e}\n'
-    
-    return doc_content
-
-# Generate docs for main modules
-modules = [
-    ('src/main.py', 'main'),
-    ('src/collectors/base_collector.py', 'base_collector'),
-    ('src/processors/translator.py', 'translator'),
-    ('src/notifiers/gmail_sender.py', 'gmail_sender'),
-]
-
-for module_path, module_name in modules:
-    if os.path.exists(module_path):
-        doc_content = generate_module_doc(module_path, module_name)
-        
-        with open(f'docs/api/{module_name}.md', 'w') as f:
-            f.write(doc_content)
-        
-        print(f'Generated docs/api/{module_name}.md')
-"
-        
-    - name: Update Architecture Diagram
-      run: |
-        echo "Updating architecture documentation..."
-        
-        cat > docs/ARCHITECTURE.md << 'EOF'
-# System Architecture
-
-## Overview
-
-The News Delivery System is designed as a modular, event-driven architecture that automatically collects, processes, and delivers news content.
-
-## Component Diagram
-
-```
-┌─────────────────────────────────────────────────────────────┐
 │                    News Delivery System                      │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │

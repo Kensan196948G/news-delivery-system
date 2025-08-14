@@ -30,7 +30,7 @@ jobs:
           // Analyze issue title and body for automatic labeling
           const title = issue.title.toLowerCase();
           const body = (issue.body || '').toLowerCase();
-          const content = `${title} ${body}`;
+          const content = '' + title + ' ' + body + '';
           
           // Auto-labeling based on keywords
           if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
@@ -86,11 +86,8 @@ jobs:
           }
           
           // Add welcome comment with guidance
-          const welcomeComment = `👋 Thanks for opening this issue!
-
-🤖 **Auto-triage results:**
-${labels.length > 0 ? `- Labels added: ${labels.join(', ')}` : '- No automatic labels applied'}
-${assignees.length > 0 ? `- Auto-assigned to: ${assignees.join(', ')}` : ''}
+          const welcomeComment = '👋 Thanks for opening this issue!\n\n🤖 **Auto-triage results:**\n' + labels.length > 0 ? `- Labels added: $\{\{labels.join(', ') + '' : '- No automatic labels applied'\}\}
+$\{\{assignees.length > 0 ? '- Auto-assigned to: ' + assignees.join(', ') + '' : ''\}\}
 
 📋 **Next steps:**
 - A maintainer will review this issue shortly
@@ -155,7 +152,7 @@ ${assignees.length > 0 ? `- Auto-assigned to: ${assignees.join(', ')}` : ''}
           const issue = context.payload.issue;
           
           // Search for similar issues
-          const query = `repo:${context.repo.owner}/${context.repo.repo} is:issue "${issue.title.substring(0, 50)}"`;
+          const query = 'repo:' + context.repo.owner + '/' + context.repo.repo + ' is:issue "' + issue.title.substring(0, 50) + '"';
           
           const { data: searchResults } = await github.rest.search.issuesAndPullRequests({
             q: query,
@@ -170,19 +167,10 @@ ${assignees.length > 0 ? `- Auto-assigned to: ${assignees.join(', ')}` : ''}
           
           if (potentialDuplicates.length > 0) {
             const duplicateList = potentialDuplicates
-              .map(item => `- #${item.number}: ${item.title}`)
+              .map(item => '- #' + item.number + ': ' + item.title + '')
               .join('\n');
             
-            const comment = `🔍 **Potential duplicate issues detected:**
-
-${duplicateList}
-
-Please check if your issue is already covered by one of the above. If this is a different issue, please provide more specific details to help distinguish it.
-
-If this is indeed a duplicate, please:
-1. Add your use case details to the existing issue
-2. Close this issue
-3. Subscribe to the existing issue for updates`;
+            const comment = '🔍 **Potential duplicate issues detected:**\n\n' + duplicateList + '\n\nPlease check if your issue is already covered by one of the above. If this is a different issue, please provide more specific details to help distinguish it.\n\nIf this is indeed a duplicate, please:\n1. Add your use case details to the existing issue\n2. Close this issue\n3. Subscribe to the existing issue for updates';
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -216,13 +204,13 @@ If this is indeed a duplicate, please:
             .map(match => parseInt(match[1]));
           
           if (issueNumbers.length > 0) {
-            const linkedIssues = issueNumbers.map(num => `#${num}`).join(', ');
+            const linkedIssues = issueNumbers.map(num => '#' + num + '').join(', ');
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: `🔗 This issue is linked to: ${linkedIssues}\n\n🤖 Automatic linking detected. This issue will be closed when the linked PR is merged.`
+              body: '🔗 This issue is linked to: ' + linkedIssues + '\n\n🤖 Automatic linking detected. This issue will be closed when the linked PR is merged.'
             });
           }
 
@@ -266,7 +254,7 @@ If this is indeed a duplicate, please:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: `🤖 Added labels: ${labels.join(', ')}`
+              body: '🤖 Added labels: ' + labels.join(', ') + ''
             });
           }
           
@@ -299,6 +287,6 @@ If this is indeed a duplicate, please:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: `🤖 Assigned to @${assignee}`
+              body: '🤖 Assigned to @' + assignee + ''
             });
           }
