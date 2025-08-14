@@ -15,7 +15,7 @@ env:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
+  actions: read
   issues: write
   checks: write
 
