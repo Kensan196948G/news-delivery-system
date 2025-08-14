@@ -1,8 +1,6 @@
 #!/bin/bash
-"""
-Install News Delivery Scheduler as System Service
-システムサービスとしてスケジューラーをインストール
-"""
+# Install News Delivery Scheduler as System Service
+# システムサービスとしてスケジューラーをインストール
 
 echo "================================================"
 echo "📦 News Delivery Scheduler Service Installation"
