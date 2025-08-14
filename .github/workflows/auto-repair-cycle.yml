@@ -225,17 +225,17 @@ jobs:
           fi
           
           if [ ! -f ".gitignore" ]; then
-            cat > .gitignore << 'GITIGNORE_CONTENT'
-__pycache__/
-*.pyc
-.env
-.pytest_cache/
-.coverage
-htmlcov/
-dist/
-build/
-*.egg-info/
-GITIGNORE_CONTENT
+            {
+              echo "__pycache__/"
+              echo "*.pyc"
+              echo ".env"
+              echo ".pytest_cache/"
+              echo ".coverage"
+              echo "htmlcov/"
+              echo "dist/"
+              echo "build/"
+              echo "*.egg-info/"
+            } > .gitignore
             CHANGES_MADE+=("gitignore_restore")
           fi
           
