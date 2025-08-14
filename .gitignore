@@ -1,0 +1,177 @@
+# News Delivery System .gitignore
+# プライベートリポジトリ用セキュリティ設定
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.directory
+desktop.ini
+
+# API Keys and Secrets (CRITICAL SECURITY)
+*.env
+.env.*
+APIKey.txt
+APIKey.txt.backup
+api_keys.txt
+secrets.json
+credentials.json
+token.json
+*.key
+*.pem
+*.cert
+*.crt
+config/credentials/
+credentials/
+
+# Specific sensitive files in this project
+config/config.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/database/
+news_system.db/
+
+# Log files
+logs/
+*.log
+log_*.txt
+E:/
+
+# Cache and temporary files
+cache/
+*.cache
+*.tmp
+*.temp
+tmp/
+temp/
+data/cache/
+data/backup/
+
+# Reports and outputs
+reports/
+*.html
+*.pdf
+data/reports/
+archives/test_*.py
+archives/final_*.py
+archives/main.py
+
+# Data directories (sensitive content)
+data/articles/
+data/news_system.db/
+
+# Backup files
+*.bak
+*.backup
+backup/
+*-BackUp/
+
+# Email test outputs
+*email*.txt
+test_delivery*.txt
+test_*email*.txt
+emergency_delivery_*.txt
+improved_delivery_test_*.txt
+realtime_test_*.txt
+
+# tmux session files (may contain sensitive data)
+archives/tmux/logs/
+archives/tmux/screenshots/
+memory/
+
+# Alert files (may contain sensitive data)
+alerts/
+*.json
+!config/*.json
+!.github/**/*.json
+!package*.json
+
+# Test execution logs
+execution_*.log
+execution_*.txt
+test_run.log
+
+# Monitoring and status files
+monitor-status-*.json
+SYSTEM_STATUS.md
+
+# MCP config (may contain sensitive data)
+*mcp-config.json
+
+# Project specific
+scheduler_state.json
+
+# Test files
+test_*.json
+*_test_results_*.json
+
+# Windows specific
+*.lnk
+
+# macOS specific
+.AppleDouble
+.LSOverride

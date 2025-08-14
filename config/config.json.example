@@ -1,0 +1,62 @@
+{
+  "general": {
+    "system_name": "News Delivery System",
+    "version": "1.0.0",
+    "timezone": "Asia/Tokyo",
+    "max_retry_attempts": 3,
+    "request_timeout": 30
+  },
+  "paths": {
+    "data_root": "data",
+    "logs": "logs",
+    "reports": "data/reports",
+    "cache": "data/cache",
+    "backup": "data/backup"
+  },
+  "api": {
+    "newsapi_key": "YOUR_NEWSAPI_KEY_HERE",
+    "deepl_api_key": "YOUR_DEEPL_API_KEY_HERE",
+    "anthropic_api_key": "YOUR_ANTHROPIC_API_KEY_HERE",
+    "gnews_api_key": "YOUR_GNEWS_API_KEY_HERE"
+  },
+  "email": {
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "sender_name": "News Delivery System",
+    "recipients": ["your-email@gmail.com"]
+  },
+  "collection": {
+    "categories": {
+      "domestic_social": {
+        "enabled": true,
+        "count": 10,
+        "priority": 1
+      },
+      "international_social": {
+        "enabled": true,
+        "count": 15,
+        "priority": 2,
+        "keywords": ["human rights", "social justice", "migration"]
+      },
+      "tech": {
+        "enabled": true,
+        "count": 20,
+        "priority": 5
+      },
+      "security": {
+        "enabled": true,
+        "count": 20,
+        "priority": 6,
+        "alert_threshold": 9.0
+      }
+    }
+  },
+  "delivery": {
+    "schedule": ["07:00", "12:00", "18:00"],
+    "urgent_notification": {
+      "enabled": true,
+      "importance_threshold": 10,
+      "cvss_threshold": 9.0
+    }
+  }
+}

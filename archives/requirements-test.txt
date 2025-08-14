@@ -1,0 +1,61 @@
+# Testing Requirements for News Delivery System
+# テストフレームワークと関連依存関係
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.1
+pytest-cov>=4.1.0
+pytest-html>=3.2.0
+pytest-xdist>=3.3.1  # Parallel test execution
+pytest-timeout>=2.1.0  # Test timeout handling
+pytest-benchmark>=4.0.0  # Performance testing
+
+# HTTP testing
+pytest-httpx>=0.21.0
+aioresponses>=0.7.4
+httpx>=0.24.0
+responses>=0.23.0
+
+# Database testing
+pytest-postgresql>=5.0.0
+pytest-sqlite>=0.3.0
+
+# Fixture and data generation
+factory-boy>=3.3.0
+faker>=19.0.0
+
+# Code quality and coverage
+coverage[toml]>=7.2.0
+pytest-cov>=4.1.0
+
+# Performance testing
+pytest-benchmark>=4.0.0
+memory-profiler>=0.60.0
+
+# API mocking and testing
+responses>=0.23.0
+betamax>=0.8.1
+
+# Additional testing utilities
+freezegun>=1.2.2  # Time mocking
+parameterized>=0.9.0  # Parameterized tests
+testfixtures>=7.1.0  # Test utilities
+
+# Report generation
+pytest-html>=3.2.0
+pytest-json-report>=1.5.0
+allure-pytest>=2.13.0  # Advanced reporting
+
+# Parallel execution
+pytest-xdist>=3.3.1
+
+# Environment and configuration testing
+pytest-env>=0.8.2
+
+# Security testing
+bandit>=1.7.5
+safety>=2.3.0
+
+# Load testing (optional)
+locust>=2.15.0

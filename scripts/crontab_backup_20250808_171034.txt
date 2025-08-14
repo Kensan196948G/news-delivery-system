@@ -1,0 +1,23 @@
+# 最適化されたITSMシステム cron設定
+# ======================================
+
+# データベースバックアップ - 2時間ごとに変更 (リソース軽減)
+0 */2 * * * /media/kensan/LinuxHDD/ITSM-ITmanagementSystem/scripts/database-backup.sh >> /tmp/itsm-backup.log 2>&1
+
+# プロジェクト全体バックアップ - 1日2回 (朝と夜)
+0 9,21 * * * /media/kensan/LinuxHDD/ITSM-ITmanagementSystem-BackUp/backup_script.sh
+
+# Git自動プッシュ - 1時間ごとに変更
+0 * * * * /media/kensan/LinuxHDD/ITSM-ITmanagementSystem/scripts/auto-git-push.sh
+
+# システム監視 - 15分ごと (軽量監視)
+*/15 * * * * /media/kensan/LinuxHDD/ITSM-ITmanagementSystem/scripts/realtime-monitor-engine.py --lightweight
+
+# ログクリーンアップ - 毎日深夜
+0 2 * * * find /media/kensan/LinuxHDD/ITSM-ITmanagementSystem/coordination/logs -name "*.log" -mtime +7 -exec gzip {} \;
+
+# 週次メンテナンス - 毎週日曜日午前3時
+0 3 * * 0 /media/kensan/LinuxHDD/ITSM-ITmanagementSystem/scripts/deployment-validation.sh
+
+# News配信システム (他プロジェクト) - 1時間ごとに変更
+0 * * * * /media/kensan/LinuxHDD/news-delivery-system/scripts/backup.sh

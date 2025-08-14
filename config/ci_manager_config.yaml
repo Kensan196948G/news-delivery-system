@@ -1,0 +1,171 @@
+# NEWS-CIManager Configuration
+# CI/CDマネージャーエージェント設定
+
+# エージェント基本設定
+agent:
+  name: "news-cimanager"
+  type: "manager"
+  capabilities:
+    - "pipeline-management"
+    - "deployment"
+  max_concurrent_operations: 10
+  timeout_seconds: 300
+
+# パイプライン設定
+pipeline:
+  # デプロイメント頻度: daily, weekly, on-demand
+  deployment_frequency: "daily"
+  
+  # 品質ゲート
+  quality_gates:
+    - "unit_tests"
+    - "integration_tests"
+    - "security_scan"
+    - "performance_test"
+    - "code_quality_check"
+  
+  # 自動化レベル: manual, semi-auto, full-auto
+  automation_level: "semi-auto"
+  
+  # ロールバック戦略: automatic, manual, blue_green, rolling
+  rollback_strategy: "automatic"
+  
+  # 監視要件
+  monitoring_requirements:
+    - "health_check"
+    - "performance_metrics"
+    - "error_tracking"
+    - "user_experience"
+    - "resource_utilization"
+
+# デプロイメント設定
+deployment:
+  environments:
+    development:
+      auto_deploy: true
+      approval_required: false
+      canary_percentage: 0
+    staging:
+      auto_deploy: true
+      approval_required: false
+      canary_percentage: 10
+    production:
+      auto_deploy: false
+      approval_required: true
+      canary_percentage: 5
+  
+  strategies:
+    # ローリングデプロイメント設定
+    rolling:
+      batch_size: 2
+      health_check_timeout: 300
+      rollback_on_failure: true
+    
+    # Blue-Greenデプロイメント設定
+    blue_green:
+      traffic_shift_duration: 900
+      validation_period: 600
+      automatic_switch: false
+
+# 監視・アラート設定
+monitoring:
+  health_check_interval: 30
+  
+  # パフォーマンス閾値
+  performance_threshold:
+    cpu_usage: 80
+    memory_usage: 85
+    response_time_ms: 1000
+    success_rate: 0.95
+    test_coverage: 0.80
+  
+  # アラート設定
+  alerts:
+    success_rate_threshold: 0.90
+    duration_threshold_minutes: 30
+    failure_count_threshold: 3
+    
+  # ダッシュボード更新間隔
+  dashboard_refresh_interval: 60
+
+# チーム・コラボレーション設定
+team:
+  # DevOps成熟度レベル: basic, developing, intermediate, advanced
+  devops_maturity_level: "developing"
+  
+  # 利用可能スキル
+  available_skills:
+    - "python_development"
+    - "git_workflow"
+    - "basic_testing"
+    - "linux_administration"
+    - "api_integration"
+  
+  # 教育・トレーニング設定
+  training:
+    enabled: true
+    schedule: "weekly"
+    focus_areas:
+      - "automated_testing"
+      - "ci_cd_best_practices"
+      - "monitoring_observability"
+
+# ログ・レポート設定
+logging:
+  level: "INFO"
+  format: "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+  
+  # ログファイル設定
+  files:
+    ci_manager: "logs/ci-manager.log"
+    agents: "logs/parallel-execution/"
+    performance: "logs/performance.log"
+  
+  # ログローテーション
+  rotation:
+    max_size_mb: 10
+    backup_count: 5
+
+# 外部システム連携
+integrations:
+  # プロジェクト管理
+  project_management:
+    enabled: false
+    type: "jira"  # jira, trello, azure_devops
+  
+  # 通知システム
+  notifications:
+    slack:
+      enabled: false
+      webhook_url: ""
+      channels:
+        - "#ci-cd"
+        - "#alerts"
+    
+    email:
+      enabled: true
+      smtp_server: "smtp.gmail.com"
+      recipients:
+        - "admin@example.com"
+
+# セキュリティ設定
+security:
+  # 認証・認可
+  authentication:
+    enabled: true
+    method: "token"
+  
+  # セキュリティスキャン
+  security_scanning:
+    enabled: true
+    tools:
+      - "dependency_check"
+      - "secrets_detection"
+      - "vulnerability_scan"
+  
+  # アクセス制御
+  access_control:
+    deployment_approval_required: true
+    admin_users:
+      - "admin"
+    read_only_users: []

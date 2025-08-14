@@ -1,0 +1,144 @@
+{
+  "general": {
+    "system_name": "News Delivery System",
+    "version": "1.0.0",
+    "timezone": "Asia/Tokyo",
+    "max_retry_attempts": 3,
+    "request_timeout": 30
+  },
+  "paths": {
+    "data_root": "data",
+    "templates": "src/templates",
+    "logs": "data/logs",
+    "articles": "data/articles",
+    "reports": "data/reports",
+    "cache": "data/cache",
+    "backup": "data/backup",
+    "database": "data/database"
+  },
+  "collection": {
+    "categories": {
+      "domestic_social": {
+        "enabled": true,
+        "count": 10,
+        "priority": 1
+      },
+      "international_social": {
+        "enabled": true,
+        "count": 15,
+        "priority": 2,
+        "keywords": ["human rights", "social justice", "migration"]
+      },
+      "domestic_economy": {
+        "enabled": true,
+        "count": 8,
+        "priority": 3
+      },
+      "international_economy": {
+        "enabled": true,
+        "count": 15,
+        "priority": 4
+      },
+      "tech": {
+        "enabled": true,
+        "count": 20,
+        "priority": 5
+      },
+      "security": {
+        "enabled": true,
+        "count": 20,
+        "priority": 6,
+        "alert_threshold": 9.0
+      }
+    }
+  },
+  "delivery": {
+    "recipients": ["kensan1969@gmail.com"],
+    "schedule": ["07:00", "12:00", "18:00"],
+    "urgent_notification": {
+      "enabled": true,
+      "importance_threshold": 10,
+      "cvss_threshold": 9.0
+    }
+  },
+  "api_limits": {
+    "newsapi": {
+      "daily_limit": 1000,
+      "rate_limit": 500
+    },
+    "deepl": {
+      "monthly_limit": 500000,
+      "batch_size": 50
+    },
+    "claude": {
+      "daily_limit": 1000,
+      "concurrent": 5
+    }
+  },
+  "cache": {
+    "api_cache_ttl": 3600,
+    "article_cache_ttl": 86400,
+    "analysis_cache_ttl": 604800
+  },
+  "logging": {
+    "level": "INFO",
+    "max_file_size": "10MB",
+    "backup_count": 5
+  },
+  "system": {
+    "version": "1.0.0",
+    "timezone": "Asia/Tokyo",
+    "language": "ja"
+  },
+  "pipeline": {
+    "deployment_frequency": "daily",
+    "quality_gates": ["unit_tests", "integration_tests", "security_scan"],
+    "automation_level": "semi-auto",
+    "rollback_strategy": "automatic",
+    "monitoring_requirements": ["health_check", "performance_metrics", "error_tracking"]
+  },
+  "news_sources": {
+    "newsapi": {
+      "api_key": "",
+      "rate_limit_per_day": 1000,
+      "enabled": true
+    },
+    "gnews": {
+      "api_key": "",
+      "rate_limit_per_day": 100,
+      "enabled": true
+    },
+    "nvd": {
+      "api_key": "",
+      "rate_limit_per_hour": 50,
+      "enabled": true
+    }
+  },
+  "translation": {
+    "deepl": {
+      "api_key": "",
+      "monthly_character_limit": 500000,
+      "enabled": true
+    }
+  },
+  "ai_analysis": {
+    "claude": {
+      "api_key": "",
+      "daily_request_limit": 1000,
+      "enabled": true
+    }
+  },
+  "agents": {
+    "max_concurrent": 10,
+    "timeout_seconds": 300,
+    "retry_attempts": 3
+  },
+  "monitoring": {
+    "health_check_interval": 30,
+    "performance_threshold": {
+      "cpu_usage": 80,
+      "memory_usage": 85,
+      "response_time": 1000
+    }
+  }
+}

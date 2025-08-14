@@ -1,0 +1,357 @@
+#!/bin/bash
+
+# Pane Manager - Unified entry point for tmux pane management
+# ペインマネージャー - tmuxペイン管理統合エントリーポイント
+
+# 設定
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPTS_DIR="$SCRIPT_DIR/scripts"
+
+# 色定義
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# ヘッダー表示
+show_header() {
+    clear
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║                    News Delivery System                       ║${NC}"
+    echo -e "${CYAN}║                      Pane Manager                             ║${NC}"
+    echo -e "${CYAN}║                 ペイン管理統合ツール                           ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# スクリプト存在確認
+check_scripts() {
+    local layout_manager="$SCRIPTS_DIR/pane-layout-manager.sh"
+    local enhanced_layout="$SCRIPTS_DIR/enhanced-pane-layout-manager.sh"
+    local log_viewer="$SCRIPTS_DIR/pane-log-viewer.sh"
+    local communication_hub="$SCRIPTS_DIR/team-communication-hub.sh"
+    local auto_start="$SCRIPTS_DIR/auto-start-servers.sh"
+    
+    if [ ! -f "$layout_manager" ] && [ ! -f "$enhanced_layout" ]; then
+        echo -e "${RED}Error: Layout manager not found${NC}"
+        return 1
+    fi
+    
+    if [ ! -f "$log_viewer" ]; then
+        echo -e "${RED}Error: Log viewer not found at $log_viewer${NC}"
+        return 1
+    fi
+    
+    if [ ! -f "$auto_start" ]; then
+        echo -e "${RED}Error: Auto start script not found at $auto_start${NC}"
+        return 1
+    fi
+    
+    return 0
+}
+
+# 使用法表示
+show_usage() {
+    echo "News Delivery System Pane Manager"
+    echo ""
+    echo "Usage: $0 [command] [options]"
+    echo ""
+    echo "Commands:"
+    echo "  layout [2|4|6]     - Create team layout with N developers"
+    echo "  enhanced [2|4|6]   - Create enhanced layout with Claude auto-auth"
+    echo "  comm               - Open team communication hub"
+    echo "  logs [realtime]    - Show logs or real-time monitoring"
+    echo "  system             - Start news system"
+    echo "  status             - Show session and system status"
+    echo "  kill               - Kill tmux session"
+    echo "  help               - Show this help"
+    echo ""
+    echo "Interactive modes:"
+    echo "  $0                 - Open main menu"
+    echo "  $0 layout          - Open layout menu"
+    echo "  $0 enhanced        - Open enhanced layout menu"
+    echo "  $0 comm            - Open communication hub"
+    echo "  $0 logs            - Open log menu"
+    echo ""
+    echo "Quick commands:"
+    echo "  $0 enhanced 2      - Create 2-dev team + Claude auto-auth"
+    echo "  $0 enhanced 4      - Create 4-dev team + Claude auto-auth"
+    echo "  $0 enhanced 6      - Create 6-dev team + Claude auto-auth"
+    echo "  $0 comm send cto manager 'start development'"
+    echo "  $0 logs realtime   - Show real-time logs"
+    echo "  $0 status          - Show quick status"
+}
+
+# ステータス表示
+show_status() {
+    echo -e "${BLUE}=== System Status ===${NC}"
+    
+    # tmuxセッション確認
+    if tmux has-session -t "news-dev-team" 2>/dev/null; then
+        echo -e "${GREEN}✓ Tmux session 'news-dev-team' is active${NC}"
+        echo ""
+        echo -e "${YELLOW}Pane information:${NC}"
+        tmux list-panes -t "news-dev-team" -F '  #{pane_index}: #{pane_title} (#{pane_width}x#{pane_height})'
+    else
+        echo -e "${YELLOW}⚠ No active tmux session found${NC}"
+    fi
+    
+    echo ""
+    
+    # システムステータス
+    if [ -f "$SCRIPTS_DIR/auto-start-servers.sh" ]; then
+        echo -e "${BLUE}=== News System Status ===${NC}"
+        "$SCRIPTS_DIR/auto-start-servers.sh" status
+    fi
+}
+
+# メインメニュー
+show_main_menu() {
+    while true; do
+        show_header
+        echo -e "${CYAN}=== Main Menu ===${NC}"
+        echo ""
+        echo "1. 📊 Basic Layout Manager (基本ペイン構成管理)"
+        echo "2. 🚀 Enhanced Team Layout + Claude (Equal Space + Grid Layout)"
+        echo "3. 💬 Team Communication Hub (チーム通信ハブ)"
+        echo "4. 📋 Log Viewer (ログビューワー)"
+        echo "5. 🤖 Claude Troubleshooting (Claude問題解決)"
+        echo "6. 📐 Terminal Size Helper (ターミナルサイズ調整)"
+        echo "7. 🛠️ Start News System (ニュースシステム起動)"
+        echo "8. 📈 Show Status (ステータス表示)"
+        echo "9. 🔧 Advanced Tools (高度なツール)"
+        echo "10. ❌ Kill Session (セッション終了)"
+        echo "q. Quit (終了)"
+        echo ""
+        read -p "Select option: " choice
+        
+        case $choice in
+            1)
+                "$SCRIPTS_DIR/pane-layout-manager.sh"
+                ;;
+            2)
+                if [ -f "$SCRIPTS_DIR/enhanced-pane-layout-manager.sh" ]; then
+                    "$SCRIPTS_DIR/enhanced-pane-layout-manager.sh"
+                else
+                    echo -e "${RED}Enhanced layout manager not found${NC}"
+                    read -p "Press Enter to continue..."
+                fi
+                ;;
+            3)
+                if [ -f "$SCRIPTS_DIR/team-communication-hub.sh" ]; then
+                    "$SCRIPTS_DIR/team-communication-hub.sh"
+                else
+                    echo -e "${RED}Communication hub not found${NC}"
+                    read -p "Press Enter to continue..."
+                fi
+                ;;
+            4)
+                "$SCRIPTS_DIR/pane-log-viewer.sh"
+                ;;
+            5)
+                if [ -f "$SCRIPTS_DIR/claude-fallback-launcher.sh" ]; then
+                    "$SCRIPTS_DIR/claude-fallback-launcher.sh"
+                else
+                    echo -e "${RED}Claude troubleshooting script not found${NC}"
+                    read -p "Press Enter to continue..."
+                fi
+                ;;
+            6)
+                if [ -f "$SCRIPT_DIR/terminal-size-helper.sh" ]; then
+                    "$SCRIPT_DIR/terminal-size-helper.sh"
+                else
+                    echo -e "${RED}Terminal size helper not found${NC}"
+                    read -p "Press Enter to continue..."
+                fi
+                ;;
+            7)
+                "$SCRIPTS_DIR/auto-start-servers.sh"
+                ;;
+            8)
+                show_status
+                read -p "Press Enter to continue..."
+                ;;
+            9)
+                show_advanced_menu
+                ;;
+            10)
+                if tmux has-session -t "news-dev-team" 2>/dev/null; then
+                    echo ""
+                    read -p "Kill tmux session 'news-dev-team'? (y/N): " confirm
+                    if [[ $confirm =~ ^[Yy]$ ]]; then
+                        tmux kill-session -t "news-dev-team"
+                        echo -e "${GREEN}Session killed${NC}"
+                    fi
+                else
+                    echo -e "${YELLOW}No session to kill${NC}"
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            q|Q)
+                echo -e "${GREEN}Exiting Pane Manager${NC}"
+                break
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                read -p "Press Enter to continue..."
+                ;;
+        esac
+    done
+}
+
+# 高度なツールメニュー
+show_advanced_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║                      Advanced Tools                         ║${NC}"
+        echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo "1. 🔄 Restart Layout (レイアウト再構築)"
+        echo "2. 📊 System Monitor (システム監視)"
+        echo "3. 📁 Log Cleanup (ログクリーンアップ)"
+        echo "4. ⚙️ Tmux Configuration (tmux設定)"
+        echo "5. 🔍 Debug Mode (デバッグモード)"
+        echo "b. Back to main menu (メインメニューに戻る)"
+        echo ""
+        read -p "Select option: " choice
+        
+        case $choice in
+            1)
+                echo ""
+                echo -e "${YELLOW}Available layouts:${NC}"
+                echo "  2 - Manager/CTO + 2 Developers"
+                echo "  4 - Manager/CTO + 4 Developers"
+                echo "  6 - Manager/CTO + 6 Developers"
+                echo ""
+                read -p "Select layout (2/4/6): " layout_choice
+                
+                case $layout_choice in
+                    2|4|6)
+                        "$SCRIPTS_DIR/pane-layout-manager.sh" "$layout_choice"
+                        ;;
+                    *)
+                        echo -e "${RED}Invalid layout choice${NC}"
+                        read -p "Press Enter to continue..."
+                        ;;
+                esac
+                ;;
+            2)
+                "$SCRIPTS_DIR/pane-log-viewer.sh" monitor
+                ;;
+            3)
+                echo ""
+                echo -e "${YELLOW}Cleaning old log files...${NC}"
+                find "$SCRIPT_DIR/logs" -name "*.log" -mtime +7 -delete 2>/dev/null
+                echo -e "${GREEN}Log cleanup completed${NC}"
+                read -p "Press Enter to continue..."
+                ;;
+            4)
+                echo ""
+                echo -e "${YELLOW}Current tmux configuration:${NC}"
+                echo "  Session name: news-dev-team"
+                echo "  Pane border status: enabled"
+                echo "  Pane titles: enabled"
+                echo ""
+                echo -e "${BLUE}To customize tmux settings, edit ~/.tmux.conf${NC}"
+                read -p "Press Enter to continue..."
+                ;;
+            5)
+                echo ""
+                echo -e "${YELLOW}Debug Information:${NC}"
+                echo "  Script directory: $SCRIPT_DIR"
+                echo "  Scripts directory: $SCRIPTS_DIR"
+                echo "  Available scripts:"
+                ls -la "$SCRIPTS_DIR"/*.sh 2>/dev/null | sed 's/^/    /'
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+            b|B)
+                break
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                read -p "Press Enter to continue..."
+                ;;
+        esac
+    done
+}
+
+# メイン処理
+main() {
+    # 必要なスクリプトの存在確認
+    if ! check_scripts; then
+        echo -e "${RED}Required scripts not found. Please check installation.${NC}"
+        exit 1
+    fi
+    
+    # tmux存在確認
+    if ! command -v tmux &> /dev/null; then
+        echo -e "${RED}Error: tmux is not installed${NC}"
+        exit 1
+    fi
+    
+    case "${1:-}" in
+        "layout")
+            if [ -n "$2" ]; then
+                "$SCRIPTS_DIR/pane-layout-manager.sh" "$2"
+            else
+                "$SCRIPTS_DIR/pane-layout-manager.sh"
+            fi
+            ;;
+        "enhanced")
+            if [ -f "$SCRIPTS_DIR/enhanced-pane-layout-manager.sh" ]; then
+                if [ -n "$2" ]; then
+                    "$SCRIPTS_DIR/enhanced-pane-layout-manager.sh" "$2"
+                else
+                    "$SCRIPTS_DIR/enhanced-pane-layout-manager.sh"
+                fi
+            else
+                echo -e "${RED}Enhanced layout manager not found${NC}"
+            fi
+            ;;
+        "comm")
+            if [ -f "$SCRIPTS_DIR/team-communication-hub.sh" ]; then
+                shift
+                "$SCRIPTS_DIR/team-communication-hub.sh" "$@"
+            else
+                echo -e "${RED}Communication hub not found${NC}"
+            fi
+            ;;
+        "logs")
+            if [ -n "$2" ]; then
+                "$SCRIPTS_DIR/pane-log-viewer.sh" "$2"
+            else
+                "$SCRIPTS_DIR/pane-log-viewer.sh"
+            fi
+            ;;
+        "system")
+            "$SCRIPTS_DIR/auto-start-servers.sh"
+            ;;
+        "status")
+            show_status
+            ;;
+        "kill")
+            if tmux has-session -t "news-dev-team" 2>/dev/null; then
+                tmux kill-session -t "news-dev-team"
+                # Enhanced cleanup
+                rm -f /tmp/claude_setup_*.sh 2>/dev/null
+                pkill -f monitor-team.sh 2>/dev/null || true
+                echo -e "${GREEN}Session 'news-dev-team' killed and cleaned up${NC}"
+            else
+                echo -e "${YELLOW}No session to kill${NC}"
+            fi
+            ;;
+        "help"|"-h"|"--help")
+            show_usage
+            ;;
+        *)
+            show_main_menu
+            ;;
+    esac
+}
+
+# スクリプト実行
+main "$@"

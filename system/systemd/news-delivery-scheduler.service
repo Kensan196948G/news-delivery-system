@@ -1,0 +1,23 @@
+[Unit]
+Description=News Delivery System Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=kensan
+Group=kensan
+WorkingDirectory=%h/news-delivery-system
+Environment=PATH=%h/news-delivery-system/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/news-delivery-system/venv/bin/python %h/news-delivery-system/tools/run_scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables (alternative to .env file)
+# Environment=NEWSAPI_KEY=your_key_here
+# Environment=GNEWS_API_KEY=your_key_here
+# Environment=DEEPL_API_KEY=your_key_here
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,79 @@
+swarm:
+  id: swarm-NEWS-autoloop
+  name: NEWS Auto DevLoop
+  objective: |
+    ニュース自動配信システムの完全な開発・運用・改善を担当するClaude エージェントスワームです。
+    各エージェントは協力して以下を実現します：
+    
+    【主要目標】
+    1. 複数ソースからのニュース自動収集（NewsAPI、NVD、GNews）
+    2. 多言語翻訳機能（DeepL API連携）
+    3. AI分析・要約（Claude API連携）
+    4. HTML/PDFレポート生成
+    5. Gmail自動配信（1日3回：7:00、12:00、18:00）
+    6. セキュリティアラート（CVSS 9.0以上の脆弱性）
+    7. 24/7システム監視・自動修復
+
+    【開発方針】
+    - アジャイル開発（2週間スプリント）
+    - 並列開発対応
+    - CI/CD自動化
+    - セキュリティファースト
+    - 高可用性（95%以上）
+    - エラー自動回復
+    - ログ監視・アラート
+    
+    【技術スタック】
+    - バックエンド: Python 3.11+, FastAPI, SQLite, Redis
+    - AI/分析: Claude API, DeepL API
+    - 配信: Gmail API, HTML/PDF生成
+    - インフラ: Windows/Linux, Docker, CI/CD
+    - 監視: ログ分析、メトリクス収集、アラート
+    
+    各エージェントは自律的に作業し、継続的にシステムの品質向上と機能拡張を行います。
+
+  queen_type: strategic
+  consensus: majority
+  agents:
+    # 戦略・ガバナンス層
+    - file: .claude/agents/NEWS-CTO.md
+    - file: .claude/agents/NEWS-Manager.md
+    - file: .claude/agents/NEWS-Policy.md
+    - file: .claude/agents/NEWS-Architect.md
+    
+    # 開発層
+    - file: .claude/agents/NEWS-DevAPI.md
+    - file: .claude/agents/NEWS-DevUI.md
+    - file: .claude/agents/NEWS-Logic.md
+    - file: .claude/agents/NEWS-DataModel.md
+    - file: .claude/agents/NEWS-GraphAPI.md
+    - file: .claude/agents/NEWS-Webhook.md
+    
+    # AI・分析層
+    - file: .claude/agents/NEWS-Analyzer.md
+    - file: .claude/agents/NEWS-AIPlanner.md
+    - file: .claude/agents/NEWS-Knowledge.md
+    - file: .claude/agents/NEWS-CSVHandler.md
+    
+    # レポート・配信層
+    - file: .claude/agents/NEWS-ReportGen.md
+    - file: .claude/agents/NEWS-Scheduler.md
+    
+    # 品質保証層
+    - file: .claude/agents/NEWS-QA.md
+    - file: .claude/agents/NEWS-Tester.md
+    - file: .claude/agents/NEWS-E2E.md
+    - file: .claude/agents/NEWS-Security.md
+    - file: .claude/agents/NEWS-Audit.md
+    
+    # UX・アクセシビリティ層
+    - file: .claude/agents/NEWS-UX.md
+    - file: .claude/agents/NEWS-Accessibility.md
+    - file: .claude/agents/NEWS-L10n.md
+    
+    # インフラ・運用層
+    - file: .claude/agents/NEWS-CI.md
+    - file: .claude/agents/NEWS-CIManager.md
+    - file: .claude/agents/NEWS-Monitor.md
+    - file: .claude/agents/NEWS-AutoFix.md
+    - file: .claude/agents/NEWS-incident-manager.md

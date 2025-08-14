@@ -1,0 +1,358 @@
+# ニュース配信システム Claude Flow 統合設定
+# News Delivery System - Claude Flow Hive-Mind Configuration
+# ===============================================
+
+# エージェント設定
+agents:
+  max_concurrent: 26
+  coordination_mode: "hierarchical"
+  specialization: "news_delivery_system"
+  communication_protocol: "context7_enhanced"
+  
+  # エージェント層構成
+  layers:
+    strategic:
+      agents: 4  # CTO, Manager, Policy, Architect
+      priority: "critical"
+      coordination: "top_down"
+    
+    development:
+      agents: 6  # DevAPI, DevUI, Logic, DataModel, GraphAPI, Webhook  
+      priority: "high"
+      coordination: "peer_to_peer"
+    
+    ai_analysis:
+      agents: 4  # Analyzer, AIPlanner, Knowledge, CSVHandler
+      priority: "high" 
+      coordination: "pipeline"
+    
+    generation:
+      agents: 2  # ReportGen, Scheduler
+      priority: "medium"
+      coordination: "sequential"
+    
+    quality:
+      agents: 5  # QA, Tester, E2E, Security, Audit
+      priority: "high"
+      coordination: "validation_pipeline"
+    
+    ux_design:
+      agents: 3  # UX, Accessibility, L10n
+      priority: "medium"
+      coordination: "design_system"
+    
+    infrastructure:
+      agents: 5  # CI, CIManager, Monitor, AutoFix, IncidentManager
+      priority: "critical"
+      coordination: "ops_pipeline"
+
+# タスク設定
+tasks:
+  priority: "critical"
+  strategy: "adaptive_parallel"
+  
+  # 主要タスクカテゴリ
+  focus_areas:
+    - news_collection      # ニュース収集（NewsAPI, NVD, GNews）
+    - translation         # 多言語翻訳（DeepL）
+    - ai_analysis         # AI分析（Claude）
+    - report_generation   # レポート生成（HTML/PDF）
+    - email_delivery      # メール配信（Gmail）
+    - security           # セキュリティ強化
+    - monitoring         # システム監視
+    - automation        # 自動化・スケジューリング
+    - testing           # テスト・品質保証
+    - performance       # パフォーマンス最適化
+    - error_handling    # エラーハンドリング
+    - data_management   # データ管理
+  
+  # 開発段階設定
+  phases:
+    phase1_foundation:
+      duration: "2 weeks"
+      focus: "architecture, database, api_integration"
+      agents: ["news-architect", "news-datamodel", "news-devapi"]
+    
+    phase2_core_features:  
+      duration: "2 weeks"
+      focus: "news_collection, translation, ai_analysis"
+      agents: ["news-devapi", "news-analyzer", "news-l10n"]
+    
+    phase3_integration:
+      duration: "2 weeks" 
+      focus: "report_generation, email_delivery, testing"
+      agents: ["news-reportgen", "news-scheduler", "news-qa"]
+
+# 言語・国際化設定
+language:
+  primary: "ja"           # 日本語メイン
+  fallback: "en"          # 英語フォールバック
+  translation_support: true
+  
+  # 翻訳設定
+  translation:
+    engine: "deepl"
+    source_languages: ["en", "es", "fr", "de", "zh", "ko"]
+    target_language: "ja"
+    quality_mode: "high"
+    preserve_formatting: true
+  
+  # ローカライゼーション
+  localization:
+    timezone: "Asia/Tokyo"
+    date_format: "YYYY年MM月DD日"
+    time_format: "HH:mm"
+    currency: "JPY"
+
+# 機能設定  
+features:
+  context7: true                  # Context7 拡張コンテキスト
+  memory_persistence: true        # メモリ永続化
+  swarm_coordination: true        # スウォーム協調
+  news_processing: true           # ニュース処理特化
+  api_integration: true           # API統合
+  real_time_processing: true      # リアルタイム処理
+  multi_format_output: true       # 多フォーマット出力
+  intelligent_caching: true       # インテリジェントキャッシュ
+  auto_recovery: true             # 自動復旧
+  advanced_analytics: true        # 高度分析
+
+# API統合設定
+apis:
+  newsapi:
+    enabled: true
+    endpoint: "https://newsapi.org/v2"
+    rate_limit: 1000  # per day
+    categories: ["general", "business", "technology", "health"]
+  
+  deepl:
+    enabled: true  
+    endpoint: "https://api-free.deepl.com/v2"
+    character_limit: 500000  # per month
+    batch_size: 50
+  
+  claude:
+    enabled: true
+    model: "claude-3-sonnet-20240229"
+    max_tokens: 1000
+    concurrent_requests: 5
+  
+  gmail:
+    enabled: true
+    api_version: "v1"
+    quota_limit: 250  # per day
+    attachment_size_limit: "25MB"
+  
+  nvd:
+    enabled: true
+    endpoint: "https://services.nvd.nist.gov/rest/json"
+    cvss_threshold: 9.0
+
+# スケジュール設定
+schedule:
+  # 配信スケジュール
+  delivery_times: ["07:00", "12:00", "18:00"]
+  timezone: "Asia/Tokyo"
+  
+  # バッチ処理スケジュール
+  batch_processing:
+    news_collection: "*/30 * * * *"  # 30分毎
+    cache_cleanup: "0 2 * * *"       # 毎日2時
+    report_archival: "0 1 * * 0"     # 毎週日曜1時
+    system_health_check: "*/5 * * * *"  # 5分毎
+  
+  # 緊急配信設定
+  emergency_delivery:
+    enabled: true
+    triggers:
+      - cvss_score: 9.0
+      - importance_score: 10
+    delay_minutes: 5
+
+# パフォーマンス設定
+performance:
+  # タイムアウト設定
+  collection_timeout: 300       # 5分 - ニュース収集
+  translation_timeout: 180      # 3分 - 翻訳処理
+  analysis_timeout: 240         # 4分 - AI分析  
+  report_generation_timeout: 120  # 2分 - レポート生成
+  email_delivery_timeout: 60    # 1分 - メール送信
+  total_process_timeout: 600    # 10分 - 全体処理
+  
+  # 並行処理設定
+  concurrent_news_sources: 6
+  concurrent_translations: 3
+  concurrent_analysis: 5
+  concurrent_reports: 2
+  
+  # キャッシュ設定
+  cache:
+    api_response_ttl: 3600      # 1時間
+    translation_ttl: 86400      # 24時間
+    analysis_ttl: 604800        # 7日間
+    dedup_ttl: 2592000         # 30日間
+
+# セキュリティ設定
+security:
+  # 暗号化
+  api_key_encryption: true
+  data_encryption_at_rest: true
+  data_encryption_in_transit: true
+  
+  # アクセス制御
+  access_control:
+    enabled: true
+    method: "oauth2"
+    token_expiry: 3600
+  
+  # データ保護
+  data_protection:
+    data_masking: true
+    pii_detection: true
+    secure_deletion: true
+  
+  # ネットワークセキュリティ  
+  network:
+    https_only: true
+    certificate_pinning: true
+    rate_limiting: true
+  
+  # 監査
+  audit_logging:
+    enabled: true
+    log_level: "INFO"
+    retention_days: 90
+
+# 監視・アラート設定
+monitoring:
+  # メトリクス
+  metrics:
+    enabled: true
+    collection_interval: 60  # seconds
+    retention_days: 30
+  
+  # ヘルスチェック
+  health_checks:
+    api_endpoints: true
+    database_connectivity: true
+    email_service: true
+    cache_service: true
+    disk_space: true
+    memory_usage: true
+  
+  # アラート設定
+  alerts:
+    # システムアラート
+    system_down: 
+      severity: "critical"
+      notification: "immediate"
+    
+    api_rate_limit_approaching:
+      severity: "warning" 
+      threshold: 80  # percent
+    
+    disk_space_low:
+      severity: "warning"
+      threshold: 80  # percent
+    
+    processing_timeout:
+      severity: "error"
+      threshold: 600  # seconds
+  
+  # 通知設定
+  notifications:
+    channels: ["email", "log"]
+    email_recipients: ["admin@example.com"]
+
+# データ管理設定  
+data_management:
+  # データベース
+  database:
+    type: "sqlite"
+    path: "./data/database/news.db"
+    backup_interval: "daily"
+    retention_days: 30
+  
+  # ファイルストレージ
+  file_storage:
+    base_path: "./data"
+    articles_path: "./data/articles"
+    reports_path: "./data/reports"  
+    cache_path: "./data/cache"
+    logs_path: "./logs"
+  
+  # データ保持ポリシー
+  retention_policy:
+    articles: 30  # days
+    reports: 90   # days 
+    logs: 30      # days
+    cache: 7      # days
+
+# 品質保証設定
+quality_assurance:
+  # テスト設定
+  testing:
+    unit_test_coverage: 90    # percent
+    integration_test_required: true
+    e2e_test_required: true
+    performance_test_required: true
+  
+  # コード品質
+  code_quality:
+    linting: true
+    type_checking: true
+    security_scanning: true
+    dependency_scanning: true
+  
+  # 承認プロセス
+  approval_process:
+    code_review_required: true
+    security_review_required: true
+    performance_review_required: true
+
+# 開発・デプロイ設定
+development:
+  # CI/CD設定
+  ci_cd:
+    enabled: true
+    pipeline: "github_actions"
+    auto_deploy: false  # 手動デプロイ
+    rollback_enabled: true
+  
+  # 開発環境
+  environments:
+    development:
+      api_mocking: true
+      debug_mode: true
+      log_level: "DEBUG"
+    
+    staging:
+      api_mocking: false
+      debug_mode: false
+      log_level: "INFO"
+    
+    production:
+      api_mocking: false
+      debug_mode: false
+      log_level: "WARNING"
+
+# エラーハンドリング設定
+error_handling:
+  # リトライ設定
+  retry_strategy:
+    max_attempts: 3
+    backoff_strategy: "exponential"
+    base_delay: 1  # seconds
+    max_delay: 60  # seconds
+  
+  # フォールバック設定  
+  fallback:
+    translation_service: "backup_service"
+    news_sources: "cached_data"
+    report_generation: "minimal_template"
+  
+  # エラー通知
+  error_notifications:
+    critical_errors: true
+    error_aggregation: true
+    notification_channels: ["email", "log"]
