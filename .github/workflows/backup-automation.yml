@@ -162,49 +162,25 @@ EOF
           incremental-*/
         retention-days: 7
         
-    - name: Create Issue on Backup Failure
+    - name: Auto-Repair on Backup Failure
       if: env.BACKUP_STATUS == 'FAILED'
       uses: actions/github-script@v7
       with:
         script: |
-          const issueTitle = `🚨 自動バックアップ失敗 (${new Date().toLocaleDateString('ja-JP')})`;
-          const issueBody = `
-## ❌ バックアップエラー
-
-**発生時刻**: ${new Date().toLocaleString('ja-JP')}
-**バックアップタイプ**: ${{ env.BACKUP_TYPE }}
-**ワークフロー**: Backup Automation
-
-### 🔍 エラー詳細
-
-バックアップ処理中にエラーが発生しました。
-
-### 🔧 対応が必要な項目
-
-1. **ストレージ容量確認**
-2. **権限設定確認** 
-3. **ファイルシステム状態確認**
-4. **手動バックアップ実行**
-
-### ⚡ 緊急対応
-
-\`\`\`bash
-# 手動バックアップ実行
-tar -czf emergency-backup-$(date +%Y%m%d-%H%M%S).tar.gz --exclude='.git' .
-\`\`\`
-
----
-
-🤖 **自動生成**: Backup Automation System
-          `;
+          console.log('🔧 バックアップ失敗検出 - 自動修復開始');
           
-          await github.rest.issues.create({
+          // 自動修復ワークフローを起動（メール配信なし）
+          await github.rest.actions.createWorkflowDispatch({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            title: issueTitle,
-            body: issueBody,
-            labels: ['bug', 'backup', 'critical', 'auto-generated']
+            workflow_id: 'auto-repair-cycle.yml',
+            ref: 'main',
+            inputs: {
+              repair_type: 'emergency'
+            }
           });
+          
+          console.log('✅ 緊急自動修復開始 - 通知はIssueのみ');
           
     - name: Summary Report
       run: |

@@ -141,58 +141,25 @@ jobs:
           echo "- 🟡 リモート同期: 差分あり (ローカル:$local_commits, リモート:$remote_commits)" >> health-report.md
         fi
         
-    - name: Create Auto-Issue if Problems Detected
+    - name: Trigger Auto-Repair if Problems Detected
       if: env.HEALTH_STATUS == 'WARNING' || env.HEALTH_STATUS == 'CRITICAL'
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require('fs');
-          let reportContent = '';
+          console.log('🔧 問題検出 - 自動修復サイクルをトリガー');
           
-          try {
-            reportContent = fs.readFileSync('health-report.md', 'utf8');
-          } catch (error) {
-            reportContent = 'レポート読み込みエラー';
-          }
-          
-          const issueTitle = `🚨 自動監視: システム異常検出 (${new Date().toLocaleDateString('ja-JP')})`;
-          const issueBody = `
-## 🔍 自動監視結果
-
-**検出時刻**: ${new Date().toLocaleString('ja-JP')}
-**監視タイプ**: 継続的システム監視（30分間隔）
-**状態**: ⚠️ 注意が必要
-
-### 📊 詳細レポート
-
-\`\`\`
-${reportContent}
-\`\`\`
-
-### 🔧 推奨アクション
-
-1. **即座に確認**: 不足ファイルの復旧
-2. **依存関係更新**: セキュリティパッチ適用
-3. **設定確認**: 重要設定の検証
-
-### 🤖 自動化情報
-
-- **検出方法**: 継続的監視ワークフロー
-- **頻度**: 30分おき
-- **次回チェック**: 約30分後
-
----
-
-🤖 **自動生成**: Continuous Monitoring System
-          `;
-          
-          await github.rest.issues.create({
+          // 自動修復ワークフローを起動
+          await github.rest.actions.createWorkflowDispatch({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            title: issueTitle,
-            body: issueBody,
-            labels: ['bug', 'monitoring', 'auto-generated', 'high-priority']
+            workflow_id: 'auto-repair-cycle.yml',
+            ref: 'main',
+            inputs: {
+              repair_type: 'auto'
+            }
           });
+          
+          console.log('✅ 自動修復サイクル開始 - メール配信なし');
           
     - name: Upload Health Report
       uses: actions/upload-artifact@v4
