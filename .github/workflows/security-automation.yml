@@ -49,7 +49,7 @@ jobs:
         
         if [ -f safety-report.json ]; then
           # Parse safety report for vulnerabilities
-          python -c " import json, sys with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
+          python3 -c " import json, sys with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]: # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') with open('safety-report.json', 'r') as f: data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') data = json.load(f) vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') vulns = data.get('vulnerabilities', []) if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}') if vulns: print(f'Found {len(vulns)} vulnerabilities') for vuln in vulns[:5]:  # Show first 5 print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
         print(f'Found {len(vulns)} vulnerabilities')
         for vuln in vulns[:5]:  # Show first 5
             print(f'- {vuln.get(\"package_name\", \"unknown\")}: {vuln.get(\"vulnerability_id\", \"unknown\")}')
@@ -67,18 +67,7 @@ jobs:
         
         if [ -f bandit-report.json ]; then
           # Parse bandit report
-          python -c "
-import json, sys
-with open('bandit-report.json', 'r') as f:
-    data = json.load(f)
-    results = data.get('results', [])
-    high_severity = [r for r in results if r.get('issue_severity') == 'HIGH']
-    medium_severity = [r for r in results if r.get('issue_severity') == 'MEDIUM']
-    
-    if high_severity:
-        print(f'Found {len(high_severity)} HIGH severity issues')
-        for issue in high_severity[:3]:
-            print(f'- {issue.get(\"test_name\", \"unknown\")}: {issue.get(\"issue_text\", \"\")}')
+          python3 -c "; import json, sys; with open('bandit-report.json', 'r') as f:;   data = json.load(f);   results = data.get('results', []);   high_severity = [r for r in results if r.get('issue_severity') == 'HIGH'];   medium_severity = [r for r in results if r.get('issue_severity') == 'MEDIUM'];   ;   if high_severity:;     print(f'Found {len(high_severity)} HIGH severity issues');     for issue in high_severity[:3]:;       print(f'- {issue.get(\"test_name\", \"unknown\")}: {issue.get(\"issue_text\", \"\")}')
         sys.exit(1)
     elif medium_severity:
         print(f'Found {len(medium_severity)} MEDIUM severity issues')
