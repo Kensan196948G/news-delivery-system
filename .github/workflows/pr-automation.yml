@@ -208,7 +208,7 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       
@@ -295,7 +295,7 @@ jobs:
     if: github.event_name == 'pull_request' && contains(github.event.pull_request.head.ref, 'deps/')
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Review dependency changes
         uses: actions/github-script@v7
