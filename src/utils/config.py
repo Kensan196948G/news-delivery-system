@@ -8,15 +8,20 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
+from .path_resolver import get_path_resolver, PathResolver
 
 
 class ConfigManager:
     """設定管理クラス"""
     
     def __init__(self, config_path: Optional[str] = None, env_path: Optional[str] = None):
-        self.project_root = Path(__file__).parent.parent.parent
-        self.config_path = config_path or self.project_root / "config" / "config.json"
-        self.env_path = env_path or self.project_root / ".env"
+        # パスリゾルバを使用して環境依存性を解決
+        self.path_resolver = get_path_resolver()
+        self.project_root = self.path_resolver.project_root
+        
+        # 設定ファイルパスの解決
+        self.config_path = Path(config_path) if config_path else self.path_resolver.get_config_path("config.json")
+        self.env_path = Path(env_path) if env_path else self.project_root / ".env"
         
         # Load environment variables
         load_dotenv(self.env_path)
@@ -26,6 +31,9 @@ class ConfigManager:
         
         # Override with environment variables
         self._apply_env_overrides()
+        
+        # Validate paths and create necessary directories
+        self._ensure_paths_exist()
     
     def _load_config(self) -> Dict[str, Any]:
         """JSON設定ファイルを読み込み"""
@@ -95,6 +103,15 @@ class ConfigManager:
             current = current[key]
         current[path[-1]] = value
     
+    def _ensure_paths_exist(self):
+        """必要なディレクトリを作成"""
+        essential_paths = [
+            'database', 'cache', 'reports', 'logs', 
+            'articles', 'backup'
+        ]
+        for path_type in essential_paths:
+            self.get_storage_path(path_type)
+    
     def get(self, *path, default=None) -> Any:
         """設定値を取得"""
         current = self.config
@@ -122,25 +139,22 @@ class ConfigManager:
         return api_key
     
     def get_storage_path(self, path_type: str) -> Path:
-        """ストレージパスを取得"""
-        base_path = Path(self.get('storage', 'external_hdd_path', default=str(self.project_root / 'data')))
-        
+        """ストレージパスを取得（環境依存性を解決）"""
+        # パスリゾルバを使用して適切なパスを取得
         path_mapping = {
-            'database': self.get('storage', 'database_path', default='news_system.db'),
-            'cache': self.get('storage', 'cache_dir', default='cache'),
-            'reports': self.get('storage', 'reports_dir', default='reports'),
-            'logs': self.get('storage', 'logs_dir', default='logs'),
-            'articles': 'articles',
-            'backup': 'backup'
+            'database': lambda: self.path_resolver.get_database_path(),
+            'cache': lambda: self.path_resolver.get_cache_path(),
+            'reports': lambda: self.path_resolver.get_report_path(),
+            'logs': lambda: self.path_resolver.get_log_path(),
+            'articles': lambda: self.path_resolver.get_article_path(),
+            'backup': lambda: self.path_resolver.get_backup_path(),
         }
         
-        relative_path = path_mapping.get(path_type, path_type)
-        full_path = base_path / relative_path
+        if path_type in path_mapping:
+            return path_mapping[path_type]()
         
-        # Create directory if it doesn't exist
-        full_path.mkdir(parents=True, exist_ok=True)
-        
-        return full_path
+        # カスタムパスの場合
+        return self.path_resolver.get_data_path(path_type)
     
     def is_service_enabled(self, service: str) -> bool:
         """サービスが有効かどうかチェック"""
