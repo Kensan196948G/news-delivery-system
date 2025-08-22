@@ -1,62 +1,53 @@
-# News Delivery System Requirements - 修正版
+# News Delivery System Requirements
 # ニュース自動配信システム依存関係
 
 # Core dependencies - 基本依存関係
-python-dotenv>=1.0.0
+aiohttp==3.9.0
+anthropic==0.18.0
+python-dotenv==1.0.0
+requests==2.31.0
 
-# HTTP client - HTTPクライアント
-aiohttp>=3.9.0
-requests>=2.31.0
+# Google API - Gmail送信
+google-auth==2.23.0
+google-auth-oauthlib==1.1.0
+google-api-python-client==2.100.0
+
+# Template processing - テンプレート処理
+jinja2==3.1.2
+
+# PDF generation - PDF生成
+pdfkit==1.0.0
 
 # Translation API - 翻訳API
-deepl>=1.12.0
-
-# Claude AI API - AI分析
-anthropic>=0.18.0
+deepl==1.16.1
 
 # News APIs - ニュースAPI
-newsapi-python>=0.2.6
-
-# Gmail API - メール送信
-google-api-python-client>=2.100.0
-google-auth>=2.23.0
-google-auth-oauthlib>=1.1.0
-google-auth-httplib2>=0.2.0
-
-# HTML template processing - HTMLテンプレート
-jinja2>=3.1.2
-
-# Date/Time handling - 日時処理
-python-dateutil>=2.8.0
-
-# Logging - ログ処理
-colorlog>=6.7.0
-
-# Security - セキュリティ
-cryptography>=41.0.0
-
-# Data processing - データ処理
-beautifulsoup4>=4.12.0
-lxml>=4.9.0
-
-# Email validation - メール検証
-email-validator>=2.0.0
-
-# YAML processing - YAML処理
-pyyaml>=6.0
-
-# CLI utilities - CLI ユーティリティ
-click>=8.1.0
+newsapi-python==0.2.7
 
 # Testing - テスト
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
+pytest==8.0.0
+pytest-asyncio==0.23.0
 
 # Code quality - コード品質
-black>=23.0.0
-flake8>=6.0.0
-mypy>=1.5.0
+black==24.0.0
+flake8==7.0.0
+isort==5.12.0
+bandit==1.7.5
+pylint==3.0.3
+autopep8==2.0.4
+autoflake==2.2.1
+safety==2.3.5
+mypy==1.8.0
 
-# Security scanning - セキュリティスキャン
-safety>=2.3.0
-bandit>=1.7.0
+# Additional utilities - その他ユーティリティ
+beautifulsoup4==4.12.3
+lxml==5.1.0
+schedule==1.2.0
+cryptography==41.0.8
+pyjwt==2.8.0
+aiofiles==23.2.1
+python-dateutil==2.8.2
+pyyaml==6.0.1
+colorlog==6.8.0
+email-validator==2.1.0
+click==8.1.7

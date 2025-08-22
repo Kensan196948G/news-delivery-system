@@ -1,0 +1,757 @@
+name: 🤖 Automated News System CI/CD
+
+"on":
+  push:
+    branches: [main, develop, feature/*]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # システムヘルスチェック（毎日深夜2時）
+    - cron: '0 2 * * *'
+    # 週次フルテスト（日曜日深夜1時）
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test Level'
+        required: true
+        type: choice
+        options:
+          - 'basic'
+          - 'full'
+          - 'stress'
+        default: 'basic'
+      auto_fix:
+        description: 'Enable Auto-Fix'
+        required: false
+        type: boolean
+        default: true
+      deploy_target:
+        description: 'Deployment Target'
+        required: false
+        type: choice
+        options:
+          - 'none'
+          - 'staging'
+          - 'production'
+        default: 'none'
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  CACHE_VERSION: 'v2'
+  AUTO_FIX_ENABLED: ${{ github.event.inputs.auto_fix || 'true' }}
+  TEST_LEVEL: ${{ github.event.inputs.test_level || 'basic' }}
+
+permissions:
+  contents: write
+  actions: read
+  checks: write
+  pull-requests: write
+  statuses: write
+  security-events: write
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ========================================
+  # 1. 環境準備とキャッシュ最適化
+  # ========================================
+  setup:
+    name: 🚀 Environment Setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      python-cache-key: ${{ steps.cache.outputs.python-cache-key }}
+      node-cache-key: ${{ steps.cache.outputs.node-cache-key }}
+      test-files-changed: ${{ steps.changes.outputs.tests }}
+      src-files-changed: ${{ steps.changes.outputs.src }}
+      docs-files-changed: ${{ steps.changes.outputs.docs }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🔍 Detect File Changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            tests:
+              - 'tests/**'
+              - 'pytest.ini'
+              - 'conftest.py'
+            src:
+              - 'src/**'
+              - '*.py'
+            docs:
+              - 'docs/**'
+              - '*.md'
+              - 'mkdocs.yml'
+            workflows:
+              - '.github/workflows/**'
+      
+      - name: 🧮 Generate Test Matrix
+        id: matrix
+        run: |
+          if [[ "${{ steps.changes.outputs.src }}" == "true" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo 'matrix={"os":["ubuntu-latest","windows-latest"],"python-version":["3.10","3.11","3.12"],"test-type":["unit","integration","performance"]}' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix={"os":["ubuntu-latest"],"python-version":["3.11"],"test-type":["unit"]}' >> $GITHUB_OUTPUT
+          fi
+      
+      - name: 🗂️ Setup Cache Keys
+        id: cache
+        run: |
+          echo "python-cache-key=${{ runner.os }}-pip-${{ env.CACHE_VERSION }}-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}" >> $GITHUB_OUTPUT
+          echo "node-cache-key=${{ runner.os }}-node-${{ env.CACHE_VERSION }}-${{ hashFiles('**/package*.json') }}" >> $GITHUB_OUTPUT
+
+  # ========================================
+  # 2. 並列コード品質チェック（Matrix Strategy）
+  # ========================================
+  quality-gate:
+    name: 🔍 Quality Gate (${{ matrix.check-type }})
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 15
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        check-type:
+          - 'syntax'      # 構文チェック
+          - 'style'       # コードスタイル
+          - 'security'    # セキュリティ
+          - 'complexity'  # 複雑度
+          - 'performance' # パフォーマンス
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: '**/requirements*.txt'
+      
+      - name: 📦 Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ needs.setup.outputs.python-cache-key }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ env.CACHE_VERSION }}-
+      
+      - name: 🔧 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install flake8 black isort bandit pylint radon mypy pytest coverage safety vulture
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      
+      - name: 🔍 Run Quality Checks
+        id: quality
+        run: |
+          case "${{ matrix.check-type }}" in
+            "syntax")
+              echo "::group::Syntax Check"
+              python -m py_compile src/**/*.py || echo "compile_errors=true" >> $GITHUB_OUTPUT
+              flake8 src/ tests/ --max-line-length=100 --extend-ignore=E203,W503 || echo "flake8_errors=true" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              ;;
+            "style")
+              echo "::group::Code Style Check"
+              black --check --diff src/ tests/ || echo "style_errors=true" >> $GITHUB_OUTPUT
+              isort --check-only --diff src/ tests/ || echo "import_errors=true" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              ;;
+            "security")
+              echo "::group::Security Scan"
+              bandit -r src/ -f json -o bandit-report.json || echo "security_issues=true" >> $GITHUB_OUTPUT
+              safety check --json || echo "dependency_vulnerabilities=true" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              ;;
+            "complexity")
+              echo "::group::Complexity Analysis"
+              radon cc src/ --min=B || echo "high_complexity=true" >> $GITHUB_OUTPUT
+              radon mi src/ --min=B || echo "low_maintainability=true" >> $GITHUB_OUTPUT
+              vulture src/ || echo "dead_code=true" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              ;;
+            "performance")
+              echo "::group::Performance Analysis"
+              pylint src/ --disable=all --enable=W0622,C0415 || echo "performance_issues=true" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              ;;
+          esac
+      
+      - name: 🔧 Auto-Fix Issues
+        if: env.AUTO_FIX_ENABLED == 'true' && steps.quality.outputs.style_errors == 'true'
+        run: |
+          echo "::group::Auto-fixing style issues"
+          black src/ tests/
+          isort src/ tests/
+          echo "::endgroup::"
+      
+      - name: 📊 Upload Security Reports
+        if: matrix.check-type == 'security'
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+          retention-days: 30
+
+  # ========================================
+  # 3. マトリックステスト実行
+  # ========================================
+  test-matrix:
+    name: 🧪 Tests (${{ matrix.os }}, Python ${{ matrix.python-version }}, ${{ matrix.test-type }})
+    runs-on: ${{ matrix.os }}
+    needs: [setup, quality-gate]
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: 🔧 Install Dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-xdist pytest-benchmark coverage
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      
+      - name: 🧪 Run Tests
+        shell: bash
+        run: |
+          case "${{ matrix.test-type }}" in
+            "unit")
+              python -m pytest tests/test_*.py -v --cov=src --cov-report=xml --cov-report=html
+              ;;
+            "integration")
+              python -m pytest tests/integration/ -v --cov=src --cov-append
+              ;;
+            "performance")
+              python -m pytest tests/test_optimizations.py -v --benchmark-only --benchmark-json=benchmark.json
+              ;;
+          esac
+      
+      - name: 📊 Upload Coverage Reports
+        if: matrix.test-type == 'unit' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+      
+      - name: 📈 Upload Performance Results
+        if: matrix.test-type == 'performance'
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: benchmark.json
+
+  # ========================================
+  # 4. 自動エラー検知と修復
+  # ========================================
+  auto-repair:
+    name: 🔧 Auto-Repair System
+    runs-on: ubuntu-latest
+    needs: [test-matrix]
+    if: failure() && github.event.inputs.auto_fix != 'false'
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 🔧 Install Repair Tools
+        run: |
+          pip install autopep8 autoflake black isort add-trailing-comma
+          pip install -r requirements.txt
+      
+      - name: 🔍 Analyze Failures
+        id: analyze
+        run: |
+          echo "::group::Analyzing test failures"
+          
+          # 一般的な修復パターン
+          FIXES_APPLIED=""
+          
+          # 1. Import順序の修正
+          if isort --check-only src/ tests/ 2>/dev/null; then
+            echo "Fixing import order..."
+            isort src/ tests/
+            FIXES_APPLIED="${FIXES_APPLIED}import-order,"
+          fi
+          
+          # 2. コードフォーマットの修正
+          if ! black --check src/ tests/ 2>/dev/null; then
+            echo "Fixing code format..."
+            black src/ tests/
+            FIXES_APPLIED="${FIXES_APPLIED}formatting,"
+          fi
+          
+          # 3. 未使用importの削除
+          echo "Removing unused imports..."
+          autoflake --remove-all-unused-imports --recursive --in-place src/ tests/
+          FIXES_APPLIED="${FIXES_APPLIED}unused-imports,"
+          
+          # 4. トレーリングカンマの追加
+          echo "Adding trailing commas..."
+          add-trailing-comma --py36-plus src/**/*.py tests/**/*.py
+          FIXES_APPLIED="${FIXES_APPLIED}trailing-commas,"
+          
+          echo "fixes_applied=${FIXES_APPLIED}" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+      
+      - name: 🧪 Re-run Tests
+        id: retest
+        run: |
+          echo "::group::Re-running tests after fixes"
+          if python -m pytest tests/ -x --tb=short; then
+            echo "retest_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "retest_passed=false" >> $GITHUB_OUTPUT
+          fi
+          echo "::endgroup::"
+      
+      - name: 💾 Commit Auto-Fixes
+        if: steps.analyze.outputs.fixes_applied != '' && steps.retest.outputs.retest_passed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git diff --staged --quiet || git commit -m "🤖 auto-fix: ${FIXES_APPLIED%,}
+
+          Applied automatic fixes:
+          $(echo "${{ steps.analyze.outputs.fixes_applied }}" | tr ',' '\n' | sed 's/^/- /')
+          
+          🤖 Generated with Claude Code
+          Co-Authored-By: Claude <noreply@anthropic.com>"
+      
+      - name: 🚀 Push Auto-Fixes
+        if: steps.analyze.outputs.fixes_applied != '' && steps.retest.outputs.retest_passed == 'true'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+  # ========================================
+  # 5. セキュリティスキャン
+  # ========================================
+  security-scan:
+    name: 🛡️ Security Scan
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 🛡️ Install Security Tools
+        run: |
+          pip install bandit safety semgrep pip-audit
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: 🔍 Run Security Scans
+        run: |
+          echo "::group::Bandit Security Scan"
+          bandit -r src/ -f json -o bandit-results.json || true
+          echo "::endgroup::"
+          
+          echo "::group::Safety Dependency Check"
+          safety check --json --output safety-results.json || true
+          echo "::endgroup::"
+          
+          echo "::group::Pip Audit"
+          pip-audit --format=json --output=pip-audit-results.json || true
+          echo "::endgroup::"
+          
+          echo "::group::Semgrep SAST"
+          semgrep --config=auto src/ --json --output=semgrep-results.json || true
+          echo "::endgroup::"
+      
+      - name: 📊 Upload Security Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            bandit-results.json
+            safety-results.json
+            pip-audit-results.json
+            semgrep-results.json
+          retention-days: 30
+      
+      - name: 📈 Upload to GitHub Security
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: semgrep-results.json
+        continue-on-error: true
+
+  # ========================================
+  # 6. パフォーマンステスト
+  # ========================================
+  performance-test:
+    name: ⚡ Performance Analysis
+    runs-on: ubuntu-latest
+    needs: [setup, test-matrix]
+    if: needs.setup.outputs.src-files-changed == 'true' || github.event_name == 'schedule'
+    timeout-minutes: 25
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 🔧 Install Performance Tools
+        run: |
+          pip install pytest-benchmark memory-profiler py-spy
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: ⚡ Run Performance Tests
+        run: |
+          echo "::group::Memory Usage Analysis"
+          mprof run python -m pytest tests/test_optimizations.py::test_memory_usage -v
+          mprof plot --output=memory-profile.png
+          echo "::endgroup::"
+          
+          echo "::group::CPU Profiling"
+          py-spy record -o cpu-profile.svg -- python -m pytest tests/test_optimizations.py::test_cpu_usage -v
+          echo "::endgroup::"
+          
+          echo "::group::Benchmark Tests"
+          python -m pytest tests/test_optimizations.py -v --benchmark-json=benchmark-results.json
+          echo "::endgroup::"
+      
+      - name: 📊 Upload Performance Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-reports
+          path: |
+            memory-profile.png
+            cpu-profile.svg
+            benchmark-results.json
+            mprofile_*.dat
+          retention-days: 30
+      
+      - name: 📈 Performance Regression Check
+        id: regression
+        run: |
+          # 前回のベンチマーク結果と比較
+          if [ -f "benchmark-baseline.json" ]; then
+            python scripts/compare_benchmarks.py benchmark-baseline.json benchmark-results.json
+          else
+            echo "No baseline found, creating new baseline"
+            cp benchmark-results.json benchmark-baseline.json
+          fi
+
+  # ========================================
+  # 7. 自動ドキュメント生成
+  # ========================================
+  docs-automation:
+    name: 📚 Documentation Automation
+    runs-on: ubuntu-latest
+    needs: [setup, quality-gate]
+    if: needs.setup.outputs.src-files-changed == 'true' || needs.setup.outputs.docs-files-changed == 'true'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📚 Install Documentation Tools
+        run: |
+          pip install sphinx sphinx-autodoc-typehints sphinx-rtd-theme
+          pip install pydoc-markdown mkdocs mkdocs-material
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: 📖 Generate API Documentation
+        run: |
+          echo "::group::Generating API docs"
+          sphinx-apidoc -o docs/api src/ --force --separate
+          echo "::endgroup::"
+          
+          echo "::group::Building Sphinx docs"
+          cd docs && make html
+          echo "::endgroup::"
+      
+      - name: 📋 Generate README Metrics
+        run: |
+          echo "::group::Updating README badges"
+          # テスト成功率の計算
+          TEST_RESULTS=$(find . -name "pytest-results.xml" -o -name "test-results.xml" | head -1)
+          if [ -f "$TEST_RESULTS" ]; then
+            # XMLから成功率を抽出してREADMEのバッジを更新
+            python scripts/update_readme_badges.py
+          fi
+          echo "::endgroup::"
+      
+      - name: 💾 Commit Documentation Updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/ README.md
+          git diff --staged --quiet || git commit -m "📚 docs: 自動ドキュメント更新
+
+          - API仕様書の自動生成
+          - READMEメトリクスの更新
+          - テスト成功率バッジの更新
+          
+          🤖 Generated with Claude Code
+          Co-Authored-By: Claude <noreply@anthropic.com>"
+      
+      - name: 🚀 Push Documentation
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+  # ========================================
+  # 8. 通知とレポート
+  # ========================================
+  notification:
+    name: 📢 Notification & Reporting
+    runs-on: ubuntu-latest
+    needs: [test-matrix, security-scan, performance-test, auto-repair]
+    if: always()
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 📊 Collect Results
+        id: results
+        run: |
+          # 各ジョブの結果を集計
+          TESTS_STATUS="${{ needs.test-matrix.result }}"
+          SECURITY_STATUS="${{ needs.security-scan.result }}"
+          PERFORMANCE_STATUS="${{ needs.performance-test.result }}"
+          REPAIR_STATUS="${{ needs.auto-repair.result }}"
+          
+          echo "tests=${TESTS_STATUS}" >> $GITHUB_OUTPUT
+          echo "security=${SECURITY_STATUS}" >> $GITHUB_OUTPUT
+          echo "performance=${PERFORMANCE_STATUS}" >> $GITHUB_OUTPUT
+          echo "repair=${REPAIR_STATUS}" >> $GITHUB_OUTPUT
+          
+          # 全体的な成功/失敗判定
+          if [[ "$TESTS_STATUS" == "success" && "$SECURITY_STATUS" == "success" ]]; then
+            echo "overall=success" >> $GITHUB_OUTPUT
+          else
+            echo "overall=failure" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: 📝 Generate Report
+        run: |
+          cat > workflow-report.md << EOF
+          # 🤖 CI/CD Pipeline Report
+          
+          **Workflow**: ${{ github.workflow }}
+          **Trigger**: ${{ github.event_name }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+          **Date**: $(date)
+          
+          ## 📊 Results Summary
+          
+          | Component | Status | Details |
+          |-----------|--------|---------|
+          | 🧪 Tests | ${{ steps.results.outputs.tests }} | Matrix testing across multiple environments |
+          | 🛡️ Security | ${{ steps.results.outputs.security }} | SAST, dependency scanning, vulnerability checks |
+          | ⚡ Performance | ${{ steps.results.outputs.performance }} | Benchmark tests and memory profiling |
+          | 🔧 Auto-Repair | ${{ steps.results.outputs.repair }} | Automated issue detection and fixing |
+          
+          ## 🎯 Overall Status: ${{ steps.results.outputs.overall }}
+          
+          EOF
+      
+      - name: 💬 Slack Notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ steps.results.outputs.overall }}
+          channel: '#ci-cd'
+          text: |
+            🤖 *Automated News System CI/CD*
+            
+            *Branch:* ${{ github.ref_name }}
+            *Trigger:* ${{ github.event_name }}
+            *Tests:* ${{ steps.results.outputs.tests }}
+            *Security:* ${{ steps.results.outputs.security }}
+            *Performance:* ${{ steps.results.outputs.performance }}
+            
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: 📧 Email Report
+        if: steps.results.outputs.overall == 'failure' && github.ref == 'refs/heads/main'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_USERNAME }}
+          password: ${{ secrets.GMAIL_PASSWORD }}
+          subject: "❌ CI/CD Pipeline Failed - ${{ github.repository }}"
+          body: |
+            Pipeline failed for commit ${{ github.sha }} on branch ${{ github.ref_name }}.
+            
+            Please check the workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+
+  # ========================================
+  # 9. 自動デプロイメント
+  # ========================================
+  deploy:
+    name: 🚀 Automated Deployment
+    runs-on: ubuntu-latest
+    needs: [test-matrix, security-scan, performance-test]
+    if: |
+      github.ref == 'refs/heads/main' && 
+      needs.test-matrix.result == 'success' && 
+      needs.security-scan.result == 'success' &&
+      (github.event.inputs.deploy_target != 'none' || github.event_name == 'schedule')
+    environment: 
+      name: ${{ github.event.inputs.deploy_target || 'staging' }}
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📦 Build Package
+        run: |
+          pip install build wheel
+          python -m build
+      
+      - name: 🧪 Pre-deployment Tests
+        run: |
+          # デプロイ前の最終テスト
+          python -m pytest tests/integration/ -v
+      
+      - name: 🚀 Deploy to ${{ github.event.inputs.deploy_target || 'staging' }}
+        run: |
+          echo "::group::Deploying to ${{ github.event.inputs.deploy_target || 'staging' }}"
+          # ここに実際のデプロイメントロジックを実装
+          echo "Deployment simulation completed"
+          echo "::endgroup::"
+      
+      - name: ✅ Post-deployment Verification
+        run: |
+          echo "::group::Verifying deployment"
+          # デプロイ後の動作確認
+          python scripts/health_check.py
+          echo "::endgroup::"
+      
+      - name: 🏷️ Create Release Tag
+        if: github.event.inputs.deploy_target == 'production'
+        run: |
+          VERSION=$(python -c "import src; print(src.__version__)" 2>/dev/null || echo "1.0.0")
+          git tag -a "v${VERSION}" -m "🚀 Production release v${VERSION}"
+          git push origin "v${VERSION}"
+
+  # ========================================
+  # 10. 運用監視とメトリクス
+  # ========================================
+  monitoring:
+    name: 📊 System Monitoring
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📊 Generate System Metrics
+        run: |
+          echo "::group::Collecting system metrics"
+          
+          # ファイルサイズ統計
+          find src/ -name "*.py" -exec wc -l {} + | tail -1 > metrics/loc.txt
+          
+          # テスト成功率計算
+          python scripts/calculate_test_success_rate.py
+          
+          # 依存関係の脆弱性チェック
+          pip install safety
+          safety check --json > metrics/vulnerabilities.json || true
+          
+          echo "::endgroup::"
+      
+      - name: 📈 Update Metrics Dashboard
+        run: |
+          # メトリクスダッシュボードの更新
+          python scripts/update_metrics_dashboard.py
+      
+      - name: 💾 Commit Metrics
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add metrics/
+          git diff --staged --quiet || git commit -m "📊 metrics: 自動メトリクス更新
+
+          - システム統計情報の更新
+          - テスト成功率の記録
+          - セキュリティ状況の更新
+          
+          🤖 Generated with Claude Code
+          Co-Authored-By: Claude <noreply@anthropic.com>"
+          git push

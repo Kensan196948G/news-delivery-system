@@ -1,0 +1,32 @@
+# GitHub CODEOWNERS file
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners - require review for all changes
+* @news-delivery-team
+
+# CI/CD workflows require DevOps team approval
+/.github/workflows/ @devops-team @news-delivery-team
+
+# Core source code requires senior developer review
+/src/ @senior-developers @news-delivery-team
+
+# Database and configuration changes require DBA review
+/config/ @database-admins @news-delivery-team
+/scripts/database/ @database-admins @news-delivery-team
+
+# Security-related files require security team review
+/src/utils/security.py @security-team @news-delivery-team
+/config/.env.example @security-team @news-delivery-team
+
+# Documentation changes can be approved by any team member
+/docs/ @news-delivery-team
+/README.md @news-delivery-team
+*.md @news-delivery-team
+
+# Test files require QA team review
+/tests/ @qa-team @news-delivery-team
+
+# Performance and optimization files require performance team review
+/src/**/optimized*.py @performance-team @news-delivery-team
+/tests/test_optimizations.py @performance-team @news-delivery-team
+/src/monitoring/ @performance-team @news-delivery-team
