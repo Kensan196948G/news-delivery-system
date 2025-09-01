@@ -36,7 +36,7 @@ bandit==1.7.5
 pylint==3.0.3
 autopep8==2.0.4
 autoflake==2.2.1
-safety==2.3.5
+safety==3.6.0
 mypy==1.8.0
 
 # Additional utilities - その他ユーティリティ
