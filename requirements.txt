@@ -31,14 +31,14 @@ pytest-asyncio==0.23.0
 
 # Code quality - コード品質
 black==24.10.0
-flake8==7.0.0
+flake8==7.3.0
 isort==5.12.0
 bandit==1.7.5
 pylint==3.0.3
 autopep8==2.0.4
 autoflake==2.2.1
 safety==2.3.5
-mypy==1.8.0
+mypy==1.17.1
 
 # Additional utilities - その他ユーティリティ
 beautifulsoup4==4.12.3
