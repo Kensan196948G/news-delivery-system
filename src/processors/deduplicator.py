@@ -213,9 +213,9 @@ class ArticleDeduplicator:
     
     def _are_articles_similar(self, article1: Article, article2: Article) -> bool:
         """記事の類似性判定"""
-        # タイトル類似度チェック
-        title1 = (article1.title_translated or article1.title).lower()
-        title2 = (article2.title_translated or article2.title).lower()
+        # タイトル類似度チェック（属性名を修正）
+        title1 = (getattr(article1, 'translated_title', None) or article1.title or "").lower()
+        title2 = (getattr(article2, 'translated_title', None) or article2.title or "").lower()
         
         title_similarity = difflib.SequenceMatcher(None, title1, title2).ratio()
         if title_similarity > self.title_similarity_threshold:
@@ -248,8 +248,8 @@ class ArticleDeduplicator:
     
     def _extract_content_for_comparison(self, article: Article) -> str:
         """比較用の内容抽出"""
-        content = article.content_translated or article.content or ""
-        summary = article.summary or ""
+        content = getattr(article, 'translated_content', None) or getattr(article, 'content', "") or ""
+        summary = getattr(article, 'summary', "") or ""
         
         # 長い方を使用（ただし最初の500文字まで）
         comparison_text = content if len(content) > len(summary) else summary
@@ -299,22 +299,25 @@ class ArticleDeduplicator:
             score += min(content_length / 1000, 5)  # 最大5点
             
             # 翻訳済みかどうか
-            if article.title_translated or article.content_translated:
+            if getattr(article, 'translated_title', None) or getattr(article, 'translated_content', None):
                 score += 2
             
             # 重要度スコア
-            score += (article.importance_score or 5) / 2
+            score += (getattr(article, 'importance_score', None) or 5) / 2
             
             # 新しい記事を優先
-            hours_old = (datetime.now() - article.published_at).total_seconds() / 3600
-            if hours_old < 24:
-                score += 2
-            elif hours_old < 72:
-                score += 1
+            published_at = getattr(article, 'published_at', None)
+            if published_at and isinstance(published_at, datetime):
+                hours_old = (datetime.now() - published_at).total_seconds() / 3600
+                if hours_old < 24:
+                    score += 2
+                elif hours_old < 72:
+                    score += 1
             
             # 信頼できるソース
             trusted_sources = ['bbc', 'reuters', 'ap', 'nhk', 'asahi', 'nikkei']
-            if any(source in article.source.lower() for source in trusted_sources):
+            source_name = getattr(article, 'source', '') or getattr(article, 'source_name', '') or ''
+            if source_name and any(source in source_name.lower() for source in trusted_sources):
                 score += 1
             
             scored_articles.append((score, article))

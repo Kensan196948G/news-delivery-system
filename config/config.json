@@ -74,6 +74,16 @@
     "claude": {
       "daily_limit": 1000,
       "concurrent": 5
+    },
+    "reuters": {
+      "hourly_limit": 1000,
+      "concurrent": 3,
+      "request_delay": 0.5
+    },
+    "bbc": {
+      "hourly_limit": 1000,
+      "concurrent": 3,
+      "request_delay": 0.3
     }
   },
   "cache": {
@@ -113,6 +123,22 @@
       "api_key": "",
       "rate_limit_per_hour": 50,
       "enabled": true
+    },
+    "reuters": {
+      "api_key": "",
+      "rate_limit_per_hour": 1000,
+      "enabled": true,
+      "feeds_enabled": ["world", "business", "technology", "cybersecurity", "politics"],
+      "content_extraction": true,
+      "cache_ttl_minutes": 15
+    },
+    "bbc": {
+      "api_key": "",
+      "rate_limit_per_hour": 1000,
+      "enabled": true,
+      "feeds_enabled": ["top_stories", "world", "business", "technology", "politics", "science"],
+      "content_extraction": false,
+      "cache_ttl_minutes": 10
     }
   },
   "translation": {

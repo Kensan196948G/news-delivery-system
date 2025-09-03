@@ -23,6 +23,7 @@ deepl==1.16.1
 
 # News APIs - ニュースAPI
 newsapi-python==0.2.7
+feedparser==6.0.10
 
 # Testing - テスト
 pytest==8.0.0
@@ -51,3 +52,17 @@ pyyaml==6.0.1
 colorlog==6.8.0
 email-validator==2.1.0
 click==8.1.7
+
+# Monitoring System - 監視システム
+psutil==5.9.6
+websockets==12.0
+matplotlib==3.8.2
+seaborn==0.13.0
+numpy==1.24.3
+pandas==2.1.4
+scikit-learn==1.3.2
+scipy==1.11.4
+sqlite3  # 標準ライブラリ
+
+# Optional desktop notifications - デスクトップ通知（オプション）
+win10toast==0.9; sys_platform == "win32"

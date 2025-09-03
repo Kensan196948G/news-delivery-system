@@ -1,0 +1,19 @@
+# Gmail Integration Dependencies
+
+# Core email functionality (built into Python)
+# smtplib - built-in
+# email - built-in
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Optional: OAuth2 support (more complex setup)
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-api-python-client>=2.100.0
+
+# Email template handling
+jinja2>=3.1.0
+
+# Async support (if needed)
+aiosmtplib>=2.0.0

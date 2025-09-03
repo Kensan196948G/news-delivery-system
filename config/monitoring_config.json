@@ -1,0 +1,244 @@
+{
+  "system": {
+    "name": "News Delivery System Monitoring",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  
+  "database": {
+    "base_path": "monitoring",
+    "performance_db": "monitoring_performance.db",
+    "logs_db": "monitoring_logs.db",
+    "alerts_db": "monitoring_alerts.db",
+    "thresholds_db": "monitoring_thresholds.db"
+  },
+  
+  "logging": {
+    "directory": "logs",
+    "level": "INFO",
+    "retention_days": 30,
+    "max_file_size_mb": 100,
+    "backup_count": 5
+  },
+  
+  "dashboard": {
+    "websocket_host": "localhost",
+    "websocket_port": 8765,
+    "http_host": "localhost", 
+    "http_port": 8080,
+    "static_dir": "static",
+    "enable_cors": true,
+    "update_interval_seconds": 5
+  },
+  
+  "performance_monitoring": {
+    "collection_interval_seconds": 30,
+    "enable_alerts": true,
+    "metrics_retention_hours": 720,
+    "thresholds": {
+      "cpu_percent": {
+        "warning": 70,
+        "critical": 90
+      },
+      "memory_percent": {
+        "warning": 80,
+        "critical": 95
+      },
+      "disk_usage_percent": {
+        "warning": 85,
+        "critical": 95
+      },
+      "error_rate": {
+        "warning": 5.0,
+        "critical": 15.0
+      },
+      "response_time_ms": {
+        "warning": 2000,
+        "critical": 5000
+      }
+    }
+  },
+  
+  "log_analysis": {
+    "analysis_interval_minutes": 30,
+    "log_levels": ["ERROR", "WARNING", "CRITICAL"],
+    "pattern_detection": {
+      "min_frequency": 3,
+      "window_size_hours": 24,
+      "enable_ml_detection": true,
+      "clustering_threshold": 0.5
+    },
+    "anomaly_detection": {
+      "enable_statistical": true,
+      "enable_ml": true,
+      "contamination_rate": 0.1,
+      "confidence_threshold": 0.7
+    }
+  },
+  
+  "alert_system": {
+    "enable_dynamic_thresholds": true,
+    "suppression_window_seconds": 300,
+    "escalation_enabled": true,
+    "auto_resolve_hours": 24,
+    "notification_channels": {
+      "email": {
+        "enabled": true,
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "use_tls": true,
+        "username": "",
+        "password": "",
+        "from_address": "",
+        "to_addresses": [],
+        "subject_prefix": "[NewsSystem Alert]"
+      },
+      "slack": {
+        "enabled": false,
+        "webhook_url": "",
+        "channel": "#alerts",
+        "username": "NewsSystem Bot",
+        "icon_emoji": ":warning:"
+      },
+      "webhook": {
+        "enabled": false,
+        "url": "",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "timeout_seconds": 30
+      },
+      "desktop": {
+        "enabled": true,
+        "duration_seconds": 10
+      }
+    },
+    "rules": {
+      "high_cpu_usage": {
+        "enabled": true,
+        "condition": "cpu_percent > get_threshold('cpu_percent')",
+        "severity": "HIGH",
+        "channels": ["email", "desktop"],
+        "suppression_window": 300,
+        "escalation_rules": [
+          {
+            "time_threshold": 1800,
+            "actions": [
+              {
+                "type": "severity_increase",
+                "new_severity": "CRITICAL"
+              }
+            ]
+          },
+          {
+            "time_threshold": 3600,
+            "actions": [
+              {
+                "type": "notification", 
+                "channels": ["slack"]
+              }
+            ]
+          }
+        ]
+      },
+      "high_memory_usage": {
+        "enabled": true,
+        "condition": "memory_percent > get_threshold('memory_percent')",
+        "severity": "HIGH",
+        "channels": ["email", "desktop"],
+        "suppression_window": 300
+      },
+      "high_error_rate": {
+        "enabled": true,
+        "condition": "error_rate > get_threshold('error_rate')",
+        "severity": "CRITICAL",
+        "channels": ["email", "slack", "desktop"],
+        "suppression_window": 180
+      },
+      "disk_space_low": {
+        "enabled": true,
+        "condition": "disk_usage_percent > get_threshold('disk_usage_percent')",
+        "severity": "MEDIUM",
+        "channels": ["email"],
+        "suppression_window": 3600
+      },
+      "slow_response_time": {
+        "enabled": true,
+        "condition": "avg_response_time > get_threshold('response_time_ms')",
+        "severity": "MEDIUM",
+        "channels": ["email"],
+        "suppression_window": 600
+      }
+    }
+  },
+  
+  "dynamic_thresholds": {
+    "update_interval_minutes": 5,
+    "history_window_size": 100,
+    "std_multiplier": 2.0,
+    "adaptive_factor": 1.2,
+    "trend_sensitivity": 0.1,
+    "min_data_points": 20,
+    "metrics": {
+      "cpu_percent": {
+        "base_threshold": 80.0,
+        "min_threshold": 50.0,
+        "max_threshold": 95.0,
+        "adaptive_factor": 1.1
+      },
+      "memory_percent": {
+        "base_threshold": 85.0,
+        "min_threshold": 60.0,
+        "max_threshold": 95.0,
+        "adaptive_factor": 1.1
+      },
+      "error_rate": {
+        "base_threshold": 5.0,
+        "min_threshold": 1.0,
+        "max_threshold": 25.0,
+        "adaptive_factor": 1.3
+      },
+      "response_time_ms": {
+        "base_threshold": 2000.0,
+        "min_threshold": 500.0,
+        "max_threshold": 10000.0,
+        "adaptive_factor": 1.2
+      }
+    }
+  },
+  
+  "integration": {
+    "enable_components": {
+      "performance": true,
+      "logs": true,
+      "alerts": true,
+      "dashboard": true
+    },
+    "health_check_interval_minutes": 5,
+    "comprehensive_report_interval_hours": 24,
+    "cleanup_old_data_days": 30
+  },
+  
+  "security": {
+    "dashboard_auth": {
+      "enabled": false,
+      "username": "admin",
+      "password": ""
+    },
+    "api_rate_limit": {
+      "enabled": true,
+      "requests_per_minute": 60
+    },
+    "allowed_hosts": ["localhost", "127.0.0.1"],
+    "enable_https": false,
+    "ssl_cert_path": "",
+    "ssl_key_path": ""
+  },
+  
+  "development": {
+    "debug_mode": false,
+    "mock_data": false,
+    "profiling_enabled": false,
+    "test_alerts": false
+  }
+}

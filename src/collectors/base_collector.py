@@ -90,8 +90,23 @@ class BaseCollector(ABC):
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """非同期コンテキストマネージャー出口"""
-        if self.session:
+        if self.session and not self.session.closed:
             await self.session.close()
+    
+    async def _ensure_session(self):
+        """セッションの存在と有効性を確保"""
+        try:
+            if not self.session or self.session.closed:
+                # 既存のセッションをクローズ（念のため）
+                if self.session and not self.session.closed:
+                    await self.session.close()
+                
+                # 新しいセッションを作成
+                self.session = aiohttp.ClientSession(timeout=self.timeout)
+                self.logger.info(f"Created new session for {self.service_name}")
+        except Exception as e:
+            self.logger.error(f"Failed to ensure session for {self.service_name}: {e}")
+            raise CollectionError(f"Session creation failed: {e}")
     
     @abstractmethod
     async def collect(self, **kwargs) -> List[Article]:
@@ -117,6 +132,12 @@ class BaseCollector(ABC):
         # リトライロジック付きHTTPリクエスト
         for attempt in range(self.max_retries):
             try:
+                # セッション状態チェック
+                if not self.session or self.session.closed:
+                    self.logger.warning(f"Session is closed or None for {self.service_name}, creating new session")
+                    # 新しいセッションを作成
+                    await self._ensure_session()
+                
                 start_time = time.time()
                 
                 async with self.session.get(url, params=params) as response:
@@ -193,6 +214,26 @@ class BaseCollector(ABC):
                     await asyncio.sleep(wait_time)
                     continue
             
+            except (aiohttp.ClientConnectionError, aiohttp.ClientError) as e:
+                wait_time = min(self.base_retry_delay * (2 ** attempt), self.max_retry_delay)
+                
+                self.logger.warning(
+                    f"Connection error for {self.service_name}: {e}. "
+                    f"Retrying in {wait_time}s (attempt {attempt + 1}/{self.max_retries})"
+                )
+                
+                # セッションエラーの場合はセッションを再作成
+                try:
+                    if self.session and not self.session.closed:
+                        await self.session.close()
+                    await self._ensure_session()
+                except Exception as session_error:
+                    self.logger.error(f"Failed to recreate session: {session_error}")
+                
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(wait_time)
+                    continue
+                    
             except Exception as e:
                 wait_time = min(self.base_retry_delay * (2 ** attempt), self.max_retry_delay)
                 

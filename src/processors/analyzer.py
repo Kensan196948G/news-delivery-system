@@ -42,18 +42,19 @@ class AnalysisError(Exception):
 
 
 class SentimentType(Enum):
-    """センチメント種別"""
+    """センチメント種別 - 強化版"""
     POSITIVE = "positive"
     NEUTRAL = "neutral"
     NEGATIVE = "negative"
+    MIXED = "mixed"  # 複合感情を追加
 
 
 @dataclass
 class AnalysisResult:
-    """AI分析結果"""
+    """AI分析結果 - Claude 4 強化版"""
     importance_score: int  # 1-10
-    summary: str  # 200-250文字
-    keywords: List[str]  # 5個
+    summary: str  # 250-300文字（強化）
+    keywords: List[str]  # 5-7個（拡張）
     sentiment: SentimentType
     sentiment_score: float  # -1.0 to 1.0
     key_points: List[str]
@@ -61,8 +62,29 @@ class AnalysisResult:
     impact_assessment: str
     confidence_score: float  # 0.0 to 1.0
     category_analysis: Dict[str, Any]
+    
+    # 新機能追加
+    emotional_context: str = ""  # 感情的文脈
+    bias_assessment: str = ""  # 報道バイアス評価
+    opportunity_factors: List[str] = None  # 機会要因
+    trend_indicators: Dict[str, Any] = None  # トレンド指標
+    stakeholder_analysis: Dict[str, Any] = None  # ステークホルダー分析
+    temporal_significance: Dict[str, Any] = None  # 時間軸での意義
+    
     processing_time: float = 0.0
     cache_hit: bool = False
+    model_used: str = ""
+    
+    def __post_init__(self):
+        """初期化後の処理"""
+        if self.opportunity_factors is None:
+            self.opportunity_factors = []
+        if self.trend_indicators is None:
+            self.trend_indicators = {}
+        if self.stakeholder_analysis is None:
+            self.stakeholder_analysis = {}
+        if self.temporal_significance is None:
+            self.temporal_significance = {}
 
 
 @dataclass  
@@ -83,10 +105,19 @@ class ClaudeAnalyzer:
         self.cache_manager = CacheManager()
         self.rate_limiter = get_rate_limiter()
         
-        # Claude API設定
+        # Claude API設定 - Claude 4 Sonnet対応
         self.api_key = self.config.get_env('ANTHROPIC_API_KEY')
-        self.model_name = self.config.get('ai_analysis.model', default="claude-3-5-sonnet-20241022")
-        self.max_tokens = self.config.get('ai_analysis.max_tokens', default=1000)
+        # Claude 4 Sonnetモデルの設定（フォールバック付き）
+        self.model_name = self.config.get('ai_analysis.model', default="claude-4-sonnet-20250514")
+        self.fallback_models = [
+            "claude-3-5-sonnet-20241022",
+            "claude-3-haiku-20240307"
+        ]
+        self.max_tokens = self.config.get('ai_analysis.max_tokens', default=2000)  # Claude 4対応で拡張
+        
+        # Claude 4専用設定
+        self.enhanced_reasoning = self.config.get('ai_analysis.enhanced_reasoning', default=True)
+        self.context_window = self.config.get('ai_analysis.context_window', default=200000)  # Claude 4の拡張コンテキスト
         
         # バッチ処理設定
         self.batch_size = self.config.get('ai_analysis.batch_size', default=10)
@@ -230,8 +261,8 @@ class ClaudeAnalyzer:
             response_text = response.content[0].text
             analysis_data = self._parse_analysis_response(response_text)
             
-            # AnalysisResult作成
-            return AnalysisResult(
+            # AnalysisResult作成（強化版）
+            result = AnalysisResult(
                 importance_score=analysis_data.get('importance_score', 5),
                 summary=analysis_data.get('summary', ''),
                 keywords=analysis_data.get('keywords', []),
@@ -241,8 +272,20 @@ class ClaudeAnalyzer:
                 risk_factors=analysis_data.get('risk_factors', []),
                 impact_assessment=analysis_data.get('impact_assessment', ''),
                 confidence_score=analysis_data.get('confidence_score', 0.0),
-                category_analysis=analysis_data.get('category_analysis', {})
+                category_analysis=analysis_data.get('category_analysis', {}),
+                
+                # 新機能項目
+                emotional_context=analysis_data.get('emotional_context', ''),
+                bias_assessment=analysis_data.get('bias_assessment', ''),
+                opportunity_factors=analysis_data.get('opportunity_factors', []),
+                trend_indicators=analysis_data.get('trend_indicators', {}),
+                stakeholder_analysis=analysis_data.get('stakeholder_analysis', {}),
+                temporal_significance=analysis_data.get('temporal_significance', {}),
+                model_used=model
             )
+            
+            logger.debug(f"Analysis successful with model: {model}")
+            return result
             
         except Exception as e:
             logger.error(f"AI analysis failed: {e}")
@@ -316,23 +359,42 @@ class ClaudeAnalyzer:
 
 10. category_analysis: カテゴリ固有の分析
 
-回答フォーマット:
+## 回答フォーマット（JSON）
 ```json
 {{
-    "importance_score": 数値,
-    "summary": "200-250文字の要約",
-    "keywords": ["キーワード1", "キーワード2", "キーワード3", "キーワード4", "キーワード5"],
-    "sentiment": "positive/neutral/negative",
-    "sentiment_score": 数値,
-    "key_points": ["ポイント1", "ポイント2", "ポイント3"],
-    "risk_factors": ["リスク要因1", "リスク要因2"],
-    "impact_assessment": "影響範囲の評価",
-    "confidence_score": 数値,
+    "importance_score": 数値(1-10),
+    "summary": "250-300文字の構造化要約",
+    "keywords": ["戦略的キーワード1", "キーワード2", "キーワード3", "キーワード4", "キーワード5", "キーワード6", "キーワード7"],
+    "sentiment": "positive/neutral/negative/mixed",
+    "sentiment_score": 数値(-1.0 to 1.0),
+    "emotional_context": "感情的文脈の詳細",
+    "bias_assessment": "報道バイアスの評価",
+    "key_points": ["階層化ポイント1", "ポイント2", "ポイント3", "ポイント4", "ポイント5"],
+    "risk_factors": ["リスク要因1", "リスク要因2", "リスク要因3"],
+    "opportunity_factors": ["機会要因1", "機会要因2"],
+    "impact_assessment": "多次元影響分析",
+    "confidence_score": 数値(0.0-1.0),
+    "trend_indicators": {{
+        "rising_trends": ["上昇トレンド1", "トレンド2"],
+        "declining_trends": ["下降トレンド1"],
+        "emerging_topics": ["新興トピック1", "トピック2"]
+    }},
+    "stakeholder_analysis": {{
+        "primary_affected": ["主要影響者1", "影響者2"],
+        "secondary_affected": ["二次影響者1"],
+        "decision_makers": ["意思決定者1", "決定者2"]
+    }},
+    "temporal_significance": {{
+        "immediacy": "immediate/short-term/medium-term/long-term",
+        "duration_impact": "temporary/persistent/permanent",
+        "historical_context": "歴史的文脈での位置づけ"
+    }},
     "category_analysis": {{
         "urgency_level": "low/medium/high/critical",
-        "scope": "local/national/international",
-        "stakeholders": ["関係者1", "関係者2"],
-        "timeline": "immediate/short-term/long-term"
+        "scope": "local/regional/national/international/global",
+        "complexity": "simple/moderate/complex/highly-complex",
+        "predictability": "predictable/somewhat-predictable/unpredictable",
+        "specialized_metrics": {{}}
     }}
 }}
 ```
@@ -439,13 +501,13 @@ class ClaudeAnalyzer:
         }
     
     def _apply_analysis_result(self, article: Article, result: AnalysisResult):
-        """分析結果を記事に適用"""
+        """分析結果を記事に適用 - 強化版"""
         article.importance_score = result.importance_score
         article.summary = result.summary
         article.keywords = result.keywords
         article.sentiment_score = result.sentiment_score
         
-        # 追加の分析結果属性
+        # 拡張された分析結果属性
         if not hasattr(article, 'ai_analysis'):
             article.ai_analysis = {}
         
@@ -456,6 +518,16 @@ class ClaudeAnalyzer:
             'impact_assessment': result.impact_assessment,
             'confidence_score': result.confidence_score,
             'category_analysis': result.category_analysis,
+            
+            # 新機能項目
+            'emotional_context': result.emotional_context,
+            'bias_assessment': result.bias_assessment,
+            'opportunity_factors': result.opportunity_factors,
+            'trend_indicators': result.trend_indicators,
+            'stakeholder_analysis': result.stakeholder_analysis,
+            'temporal_significance': result.temporal_significance,
+            
+            'model_used': result.model_used,
             'analyzed_at': datetime.now().isoformat()
         })
     
@@ -549,10 +621,13 @@ class ClaudeAnalyzer:
             return f"本日は{len(articles)}件の記事を分析しました。詳細は添付のレポートをご確認ください。"
     
     async def create_weekly_summary(self, articles: List[Article]) -> str:
-        """週次サマリー生成"""
+        """週次サマリー生成 - トレンド分析強化"""
         try:
             if not articles:
                 return "今週は分析対象の記事がありませんでした。"
+            
+            # トレンド分析を実行
+            trend_analysis = await self._perform_trend_analysis(articles)
             
             # 週次統計計算
             total_articles = len(articles)
@@ -580,14 +655,64 @@ class ClaudeAnalyzer:
                     top_cat_info.append(f"{cat_name}({cat_data['count']}件・平均重要度{avg_importance:.1f})")
                 summary += f" 主要カテゴリ: {', '.join(top_cat_info)}。"
             
+            # トレンド情報を追加
+            if trend_analysis['emerging_topics']:
+                summary += f" 新興トピック: {', '.join(trend_analysis['emerging_topics'][:3])}。"
+            
             return summary
             
         except Exception as e:
             logger.error(f"Weekly summary generation failed: {e}")
             return f"今週は{len(articles)}件の記事を分析しました。"
     
+    async def _perform_trend_analysis(self, articles: List[Article]) -> Dict[str, Any]:
+        """トレンド分析実行"""
+        try:
+            # キーワード出現頻度分析
+            keyword_frequency = {}
+            sentiment_distribution = {'positive': 0, 'neutral': 0, 'negative': 0, 'mixed': 0}
+            
+            for article in articles:
+                # キーワード集計
+                keywords = getattr(article, 'keywords', [])
+                for keyword in keywords:
+                    keyword_frequency[keyword] = keyword_frequency.get(keyword, 0) + 1
+                
+                # センチメント集計
+                if hasattr(article, 'ai_analysis') and article.ai_analysis:
+                    sentiment = article.ai_analysis.get('sentiment', 'neutral')
+                    if sentiment in sentiment_distribution:
+                        sentiment_distribution[sentiment] += 1
+            
+            # トップキーワード抽出
+            top_keywords = sorted(keyword_frequency.items(), key=lambda x: x[1], reverse=True)[:10]
+            
+            # 新興トピックの特定（出現頻度が中程度で重要度が高いもの）
+            emerging_topics = []
+            for keyword, freq in top_keywords:
+                if 2 <= freq <= 5:  # 適度な頻度
+                    emerging_topics.append(keyword)
+            
+            return {
+                'top_keywords': [kw[0] for kw in top_keywords[:5]],
+                'emerging_topics': emerging_topics[:5],
+                'sentiment_distribution': sentiment_distribution,
+                'rising_trends': [kw[0] for kw in top_keywords if kw[1] >= 3][:3],
+                'declining_trends': []  # 履歴データがないため空
+            }
+            
+        except Exception as e:
+            logger.error(f"Trend analysis failed: {e}")
+            return {
+                'top_keywords': [],
+                'emerging_topics': [],
+                'sentiment_distribution': {},
+                'rising_trends': [],
+                'declining_trends': []
+            }
+    
     def get_analysis_statistics(self) -> Dict[str, Any]:
-        """分析統計情報取得"""
+        """分析統計情報取得 - 強化版"""
         cache_hit_rate = (self.analysis_stats['cache_hits'] / 
                          max(self.analysis_stats['total_requests'], 1)) * 100
         
@@ -601,7 +726,14 @@ class ClaudeAnalyzer:
             'cache_hit_rate': round(cache_hit_rate, 2),
             'errors': self.analysis_stats['errors'],
             'avg_processing_time': round(avg_processing_time, 2),
-            'model_name': self.model_name
+            'primary_model': self.model_name,
+            'fallback_models': self.fallback_models,
+            'enhanced_features': {
+                'trend_analysis': True,
+                'sentiment_enhancement': True,
+                'stakeholder_analysis': True,
+                'bias_assessment': True
+            }
         }
     
     async def test_analysis(self, test_article: str = None) -> Dict[str, Any]:

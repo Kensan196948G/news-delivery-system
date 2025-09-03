@@ -167,7 +167,7 @@ class NVDCollector(BaseCollector):
                 title=title,
                 content=content,
                 url=f"https://nvd.nist.gov/vuln/detail/{cve_id}",
-                source='NVD',
+                source_name='NVD',
                 category=ArticleCategory.SECURITY,
                 language=ArticleLanguage.ENGLISH,
                 published_at=published_date,
@@ -175,9 +175,7 @@ class NVDCollector(BaseCollector):
                 
                 # 脆弱性固有情報
                 cvss_score=cvss_score,
-                cvss_vector=cvss_vector,
                 cve_id=cve_id,
-                severity=severity,
                 importance_score=importance_score
             )
             

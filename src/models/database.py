@@ -25,7 +25,15 @@ class Database:
     def __init__(self, config=None):
         self.config = config or load_config()
         self.logger = setup_logger(__name__)
-        self.db_path = self.config.get_storage_path('database') / 'news_system.db'
+        
+        # Try multiple database paths
+        db_dir = self.config.get_storage_path('database')
+        
+        # Create database directory if it doesn't exist
+        db_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Use news.db as the primary database file
+        self.db_path = db_dir / 'news.db'
         
         # Initialize database
         self._initialize_database()

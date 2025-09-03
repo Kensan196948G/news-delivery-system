@@ -464,7 +464,15 @@ class NewsDeliverySystem:
             date_str = datetime.now().strftime('%Y%m%d')
             html_filename = f"daily_news_report_{date_str}.html"
             
-            reports_dir = Path(self.config.get('paths.data_root', '/tmp')) / 'reports' / 'daily'
+            # より安全なパス取得
+            data_root = self.config.get('paths.data_root')
+            if data_root is None:
+                # フォールバックパスを使用
+                data_root = Path.cwd() / 'reports'
+            else:
+                data_root = Path(data_root)
+            
+            reports_dir = data_root / 'reports' / 'daily'
             reports_dir.mkdir(parents=True, exist_ok=True)
             
             html_path = reports_dir / html_filename
@@ -526,7 +534,10 @@ class NewsDeliverySystem:
             
             # 配信履歴をログ
             recipients = self.config.get('delivery.recipients', [])
-            for recipient in recipients:
+            if not recipients:
+                recipients = [self.config.get('recipient_email', 'default@example.com')]
+            
+            for recipient in (recipients or []):
                 self.db.log_delivery(
                     delivery_type='scheduled',
                     recipient_email=recipient,

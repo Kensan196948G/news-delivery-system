@@ -18,6 +18,8 @@ from .base_collector import BaseCollector, CollectionError
 from .newsapi_collector import NewsAPICollector
 from .gnews_collector import GNewsCollector
 from .nvd_collector import NVDCollector
+from .reuters_collector import ReutersCollector
+from .bbc_collector import BBCCollector
 from models.article import Article, ArticleCategory, ArticleLanguage
 from utils.config import get_config
 from utils.logger import setup_logger
@@ -111,6 +113,14 @@ class CollectionManager:
             # NVD収集器
             if self.config.get('news_sources', 'nvd', 'enabled', default=True):
                 self.collectors['nvd'] = NVDCollector(self.config, self.logger)
+            
+            # Reuters収集器
+            if self.config.get('news_sources', 'reuters', 'enabled', default=True):
+                self.collectors['reuters'] = ReutersCollector(self.config, self.logger)
+                
+            # BBC収集器
+            if self.config.get('news_sources', 'bbc', 'enabled', default=True):
+                self.collectors['bbc'] = BBCCollector(self.config, self.logger)
                 
             self.logger.info(f"Initialized {len(self.collectors)} collectors: {list(self.collectors.keys())}")
             
@@ -131,13 +141,23 @@ class CollectionManager:
             # 国際ニュース
             CollectionTarget('gnews', 'general', 15, 2, True, {'language': 'en', 'country': 'us'}),
             CollectionTarget('gnews', 'human_rights', 15, 2, True, {'special_collection': True}),
+            CollectionTarget('reuters', 'international_social', 15, 2, True, {}),
+            CollectionTarget('bbc', 'international_social', 15, 2, True, {}),
             
             # 技術ニュース
             CollectionTarget('newsapi', 'technology', 20, 5, True, {'language': 'en'}),
             CollectionTarget('gnews', 'technology', 20, 5, True, {'special_collection': True}),
+            CollectionTarget('reuters', 'tech', 15, 5, True, {}),
+            CollectionTarget('bbc', 'tech', 15, 5, True, {}),
+            
+            # 経済ニュース
+            CollectionTarget('reuters', 'international_economy', 12, 4, True, {}),
+            CollectionTarget('bbc', 'international_economy', 12, 4, True, {}),
             
             # セキュリティ
             CollectionTarget('nvd', 'vulnerabilities', 20, 6, True, {'days_back': 7, 'cvss_severity': 'HIGH,CRITICAL'}),
+            CollectionTarget('reuters', 'security', 10, 6, True, {}),
+            CollectionTarget('bbc', 'security', 10, 6, True, {}),
         ]
         
         # 設定ファイルからカスタム設定を読み込み
@@ -328,6 +348,10 @@ class CollectionManager:
                 articles = await self._collect_from_gnews(collector, category, count, filters)
             elif source == 'nvd':
                 articles = await self._collect_from_nvd(collector, category, count, filters)
+            elif source == 'reuters':
+                articles = await self._collect_from_reuters(collector, category, count, filters)
+            elif source == 'bbc':
+                articles = await self._collect_from_bbc(collector, category, count, filters)
             else:
                 raise CollectionError(f"Unknown source: {source}")
             
@@ -400,6 +424,16 @@ class CollectionManager:
         cvss_severity = filters.get('cvss_severity', 'HIGH,CRITICAL')
         
         return await collector.collect(days_back=days_back, cvss_severity=cvss_severity)
+    
+    async def _collect_from_reuters(self, collector: ReutersCollector,
+                                  category: str, count: int, filters: Dict[str, Any]) -> List[Article]:
+        """Reutersからの収集"""
+        return await collector.collect(category=category, count=count)
+    
+    async def _collect_from_bbc(self, collector: BBCCollector,
+                               category: str, count: int, filters: Dict[str, Any]) -> List[Article]:
+        """BBCからの収集"""
+        return await collector.collect(category=category, count=count)
     
     def _apply_quality_filters(self, articles: List[Article]) -> List[Article]:
         """品質フィルターの適用"""
